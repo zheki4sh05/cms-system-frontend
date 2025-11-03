@@ -1,4 +1,6 @@
-function ExecutiveReportsPage() {
+import type { FC } from 'react';
+
+export const ExecutiveReportsPage: FC = () => {
     return ( <div></div> );
 }
 
