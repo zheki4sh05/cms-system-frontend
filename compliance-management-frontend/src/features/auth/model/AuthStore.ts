@@ -1,6 +1,7 @@
 import { makeAutoObservable, runInAction } from 'mobx';
-import { AuthApi } from '@shared/lib/api/authApi';
-import { User, LoginCredentials, UserRole } from '@shared/types/user.types';
+import type { User, LoginCredentials, UserRole } from '@shared/types/customTypes';
+import { UserRoleValues } from '@shared/types/customTypes';
+import { AuthApi } from './../../../shared/lib/api/authApi';
 
 export class AuthStore {
   user: User | null = null;
@@ -110,17 +111,17 @@ export class AuthStore {
 
   // Проверка доступа для менеджера
   get isManager(): boolean {
-    return this.hasRole(UserRole.MANAGER);
+    return this.hasRole(UserRoleValues.MANAGER);
   }
 
   // Проверка доступа для руководителя
   get isSupervisor(): boolean {
-    return this.hasRole(UserRole.SUPERVISOR);
+    return this.hasRole(UserRoleValues.SUPERVISOR);
   }
 
   // Проверка доступа для топ-менеджмента
   get isExecutive(): boolean {
-    return this.hasRole(UserRole.EXECUTIVE);
+    return this.hasRole(UserRoleValues.EXECUTIVE);
   }
 
   // Получение полного имени пользователя

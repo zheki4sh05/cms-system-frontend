@@ -20,9 +20,17 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true,
+
+    /* Отключаем слишком строгие настройки */
+    "erasableSyntaxOnly": false,
+    "noUncheckedSideEffectImports": false,
+
+    /* Decorators for MobX */
+    "experimentalDecorators": true,
+
+
+    /* Path mapping */
     "baseUrl": ".",
     "paths": {
       "@app/*": ["./src/app/*"],

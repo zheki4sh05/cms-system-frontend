@@ -1,4 +1,5 @@
-import { FC, ReactNode, createContext, useContext } from 'react';
+import type { FC, ReactNode } from 'react';
+import { createContext, useContext } from 'react';
 import { RootStore } from '@shared/lib/store/RootStore';
 
 const StoreContext = createContext<RootStore | null>(null);
