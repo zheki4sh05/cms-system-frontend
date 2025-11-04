@@ -20,13 +20,15 @@ import { SupervisorIncidentsPage } from '@pages/supervisor/IncidentsPage/Supervi
 import { SupervisorAnalyticsPage } from '@pages/supervisor/AnalyticsPage/SuperVisorAnalyticsPage';
 
 // Executive pages
-import { ExecutiveDashboardPage } from '@pages/executive/DashboardPage/DashBoardPage';
+import { ExecutiveDashboardPage } from '@pages/executive/DashboardPage/ExecutiveDashboardPage';
 import { ExecutiveReportsPage } from '@pages/executive/ReportsPage/ExecutiveReportsPage';
 
 // Other
 import { NotFoundPage } from '@pages/NotFoundPage/NotFoundPage';
 import { ProtectedRoute } from '@shared/lib/hooks/ProtectedRoute';
 import { UserRoleValues } from '@shared/types/customTypes';
+import { AppLayout } from '@widgets/Layout/AppLayout';
+import { SupervisorRulesPage } from '@pages/supervisor/RulesPage/SupervisorRulesPage';
 
 export const RouterProvider: FC = observer(() => {
   return (
@@ -36,88 +38,52 @@ export const RouterProvider: FC = observer(() => {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
 
-        {/* Manager routes */}
+        {/* Manager routes with Layout */}
         <Route
-          path="/manager/dashboard"
+          path="/manager/*"
           element={
             <ProtectedRoute allowedRoles={[UserRoleValues.MANAGER]}>
-              <ManagerDashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/manager/incidents"
-          element={
-            <ProtectedRoute allowedRoles={[UserRoleValues.MANAGER]}>
-              <ManagerIncidentsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/manager/cases"
-          element={
-            <ProtectedRoute allowedRoles={[UserRoleValues.MANAGER]}>
-              <ManagerCasesPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/manager/tasks"
-          element={
-            <ProtectedRoute allowedRoles={[UserRoleValues.MANAGER]}>
-              <ManagerTasksPage />
+              <AppLayout>
+                <Routes>
+                  <Route path="dashboard" element={<ManagerDashboardPage />} />
+                  <Route path="incidents" element={<ManagerIncidentsPage />} />
+                  <Route path="cases" element={<ManagerCasesPage />} />
+                  <Route path="tasks" element={<ManagerTasksPage />} />
+                </Routes>
+              </AppLayout>
             </ProtectedRoute>
           }
         />
 
-        {/* Supervisor routes */}
+        {/* Supervisor routes with Layout */}
         <Route
-          path="/supervisor/dashboard"
+          path="/supervisor/*"
           element={
             <ProtectedRoute allowedRoles={[UserRoleValues.SUPERVISOR]}>
-              <SupervisorDashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/supervisor/cases"
-          element={
-            <ProtectedRoute allowedRoles={[UserRoleValues.SUPERVISOR]}>
-              <SupervisorCasesPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/supervisor/incidents"
-          element={
-            <ProtectedRoute allowedRoles={[UserRoleValues.SUPERVISOR]}>
-              <SupervisorIncidentsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/supervisor/analytics"
-          element={
-            <ProtectedRoute allowedRoles={[UserRoleValues.SUPERVISOR]}>
-              <SupervisorAnalyticsPage />
+              <AppLayout>
+                <Routes>
+                  <Route path="dashboard" element={<SupervisorDashboardPage />} />
+                  <Route path="cases" element={<SupervisorCasesPage />} />
+                  <Route path="incidents" element={<SupervisorIncidentsPage />} />
+                  <Route path="analytics" element={<SupervisorAnalyticsPage />} />
+                  <Route path="rules" element={<SupervisorRulesPage />} />
+                </Routes>
+              </AppLayout>
             </ProtectedRoute>
           }
         />
 
-        {/* Executive routes */}
+        {/* Executive routes with Layout */}
         <Route
-          path="/executive/dashboard"
+          path="/executive/*"
           element={
             <ProtectedRoute allowedRoles={[UserRoleValues.EXECUTIVE]}>
-              <ExecutiveDashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/executive/reports"
-          element={
-            <ProtectedRoute allowedRoles={[UserRoleValues.EXECUTIVE]}>
-              <ExecutiveReportsPage />
+              <AppLayout>
+                <Routes>
+                  <Route path="dashboard" element={<ExecutiveDashboardPage />} />
+                  <Route path="reports" element={<ExecutiveReportsPage />} />
+                </Routes>
+              </AppLayout>
             </ProtectedRoute>
           }
         />

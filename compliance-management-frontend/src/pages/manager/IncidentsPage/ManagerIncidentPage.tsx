@@ -1,18 +1,19 @@
 
-import { type FC } from 'react';
-import { Container, Typography, Box } from '@mui/material';
+import type { FC } from 'react';
+import { Typography, Box, Paper } from '@mui/material';
 
 export const ManagerIncidentsPage: FC = () => {
   return (
-    <Container maxWidth="xl">
-      <Box sx={{ mt: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          Инциденты
+    <Box>
+      <Typography variant="h4" gutterBottom>
+        Инциденты
+      </Typography>
+      <Paper sx={{ p: 3, mt: 2 }}>
+        <Typography variant="body1" color="text.secondary">
+          Здесь будет список инцидентов, назначенных на менеджера.
+          Можно будет фильтровать, сортировать и переходить к деталям.
         </Typography>
-        <Typography variant="body1">
-          Здесь будет список инцидентов менеджера
-        </Typography>
-      </Box>
-    </Container>
+      </Paper>
+    </Box>
   );
 };

@@ -1,18 +1,17 @@
-
-import { Container, Typography, Box } from '@mui/material';
 import type { FC } from 'react';
+import { Typography, Box, Paper } from '@mui/material';
 
 export const SupervisorDashboardPage: FC = () => {
   return (
-    <Container maxWidth="xl">
-      <Box sx={{ mt: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          Панель руководителя закупок
+    <Box>
+      <Typography variant="h4" gutterBottom>
+        Панель руководителя
+      </Typography>
+      <Paper sx={{ p: 3, mt: 2 }}>
+        <Typography variant="body1" color="text.secondary">
+          Здесь будет панель с KPI команды, очередью на верификацию и проблемными зонами.
         </Typography>
-        <Typography variant="body1">
-          Здесь будут отображаться KPI команды и очередь на верификацию
-        </Typography>
-      </Box>
-    </Container>
+      </Paper>
+    </Box>
   );
 };
