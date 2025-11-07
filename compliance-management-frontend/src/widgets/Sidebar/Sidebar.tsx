@@ -72,7 +72,7 @@ export const Sidebar: FC<SidebarProps> = observer(({
           alignItems: 'center',
           justifyContent: open ? 'space-between' : 'center',
           p: 2,
-          minHeight: 64,
+          minHeight: 70,
         }}
       >
         {open && (
@@ -148,9 +148,10 @@ export const Sidebar: FC<SidebarProps> = observer(({
                 {open && (
                   <ListItemText 
                     primary={item.label}
-                    primaryTypographyProps={{
+                    sx={{
                       fontSize: '0.875rem',
                       fontWeight: isActive ? 600 : 400,
+                      textWrap: "nowrap"
                     }}
                   />
                 )}

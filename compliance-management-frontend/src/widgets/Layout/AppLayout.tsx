@@ -38,7 +38,7 @@ export const AppLayout: FC<AppLayoutProps> = ({ children }) => {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen,
           }),
-          marginLeft: `${sidebarOpen ? DRAWER_WIDTH : DRAWER_WIDTH_CLOSED}px`,
+          marginLeft: `10px`,
           width: `calc(100% - ${sidebarOpen ? DRAWER_WIDTH : DRAWER_WIDTH_CLOSED}px)`,
         }}
       >
