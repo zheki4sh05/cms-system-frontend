@@ -1,18 +1,18 @@
-
-import type { UserRole } from '@shared/types/customTypes';
-import  { UserRoleValues } from '@shared/types/customTypes';
+import { UserRoleValues } from '@shared/types/customTypes';
 import {
   DashboardOutlined,
   ReportProblemOutlined,
   FolderOpenOutlined,
   AssignmentOutlined,
+  PeopleOutlined,
   AnalyticsOutlined,
   RuleOutlined,
   DescriptionOutlined,
   BusinessOutlined,
+  HelpOutlineOutlined,
 } from '@mui/icons-material';
-import type { SvgIconTypeMap } from '@mui/material';
-import type { OverridableComponent } from '@mui/material/OverridableComponent';
+import { type SvgIconTypeMap } from '@mui/material';
+import { type OverridableComponent } from '@mui/material/OverridableComponent';
 
 export interface NavigationItem {
   id: string;
@@ -20,7 +20,7 @@ export interface NavigationItem {
   path: string;
   icon: OverridableComponent<SvgIconTypeMap>;
   roles: string[];
-  badge?: number; // Для отображения количества (например, новых инцидентов)
+  badge?: number;
 }
 
 // Конфигурация навигации для всех ролей
@@ -52,6 +52,13 @@ export const navigationItems: NavigationItem[] = [
     label: 'Мои задачи',
     path: '/manager/tasks',
     icon: AssignmentOutlined,
+    roles: [UserRoleValues.MANAGER],
+  },
+  {
+    id: 'manager-help',
+    label: 'Помощь',
+    path: '/manager/help',
+    icon: HelpOutlineOutlined,
     roles: [UserRoleValues.MANAGER],
   },
 
@@ -91,6 +98,13 @@ export const navigationItems: NavigationItem[] = [
     icon: RuleOutlined,
     roles: [UserRoleValues.SUPERVISOR],
   },
+  {
+    id: 'supervisor-help',
+    label: 'Помощь',
+    path: '/supervisor/help',
+    icon: HelpOutlineOutlined,
+    roles: [UserRoleValues.SUPERVISOR],
+  },
 
   // ========== ТОП-МЕНЕДЖМЕНТ ==========
   {
@@ -107,10 +121,17 @@ export const navigationItems: NavigationItem[] = [
     icon: DescriptionOutlined,
     roles: [UserRoleValues.EXECUTIVE],
   },
+  {
+    id: 'executive-help',
+    label: 'Помощь',
+    path: '/executive/help',
+    icon: HelpOutlineOutlined,
+    roles: [UserRoleValues.EXECUTIVE],
+  },
 ];
 
 // Функция для получения элементов навигации по роли
-export const getNavigationByRole = (role: UserRole | null): NavigationItem[] => {
+export const getNavigationByRole = (role: string | null): NavigationItem[] => {
   if (!role) return [];
   return navigationItems.filter(item => item.roles.includes(role));
 };

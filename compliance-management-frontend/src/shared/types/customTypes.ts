@@ -13,6 +13,7 @@ export interface User {
   lastName: string;
   role: UserRole;
   departmentId?: string;
+  isFirstLogin?: boolean;
 }
 
 export interface AuthTokens {

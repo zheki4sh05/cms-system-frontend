@@ -6,7 +6,7 @@ const StoreContext = createContext<RootStore | null>(null);
 
 const rootStore = new RootStore();
 
-interface StoreProviderProps {
+interface StoreProviderProps {  
   children: ReactNode;
 }
 

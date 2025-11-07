@@ -1,4 +1,3 @@
-
 import {type FC, useState, type MouseEvent } from 'react';
 import { observer } from 'mobx-react-lite';
 import {
@@ -26,6 +25,7 @@ import {
 import { alpha, styled } from '@mui/material/styles';
 import { useAuthStore } from '@features/auth/useAuthStore';
 import { useNavigate } from 'react-router-dom';
+import { ProfileDrawer } from './../../features/profile/ui/ProfileDrawer';
 
 // Styled компоненты для поиска
 const Search = styled('div')(({ theme }) => ({
@@ -73,6 +73,7 @@ export const Header: FC = observer(() => {
 
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [searchValue, setSearchValue] = useState('');
+  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
 
   const handleMenuOpen = (event: MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -80,6 +81,11 @@ export const Header: FC = observer(() => {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleOpenProfile = () => {
+    setProfileDrawerOpen(true);
+    handleMenuClose();
   };
 
   const handleLogout = async () => {
@@ -116,132 +122,140 @@ export const Header: FC = observer(() => {
   };
 
   return (
-    <AppBar 
-      position="sticky" 
-      elevation={0}
-      sx={{ 
-        backgroundColor: 'white', 
-        color: 'text.primary',
-        borderBottom: '1px solid',
-        borderColor: 'divider',
-      }}
-    >
-      <Toolbar>
-        {/* Поиск */}
-        <Search>
-          <SearchIconWrapper>
-            <SearchIcon />
-          </SearchIconWrapper>
-          <form onSubmit={handleSearch}>
-            <StyledInputBase
-              placeholder="Поиск по системе..."
-              inputProps={{ 'aria-label': 'search' }}
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
-            />
-          </form>
-        </Search>
+    <>
+      <AppBar 
+        position="sticky" 
+        elevation={0}
+        sx={{ 
+          backgroundColor: 'white', 
+          color: 'text.primary',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+        }}
+      >
+        <Toolbar>
+          {/* Поиск */}
+          <Search>
+            <SearchIconWrapper>
+              <SearchIcon />
+            </SearchIconWrapper>
+            <form onSubmit={handleSearch}>
+              <StyledInputBase
+                placeholder="Поиск по системе..."
+                inputProps={{ 'aria-label': 'search' }}
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+              />
+            </form>
+          </Search>
 
-        <Box sx={{ flexGrow: 1 }} />
+          <Box sx={{ flexGrow: 1 }} />
 
-        {/* Правая часть */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {/* Уведомления */}
-          <Tooltip title="Уведомления">
-            <IconButton color="inherit">
-              <Badge badgeContent={3} color="error">
-                <NotificationsIcon />
-              </Badge>
-            </IconButton>
-          </Tooltip>
+          {/* Правая часть */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {/* Уведомления */}
+            <Tooltip title="Уведомления">
+              <IconButton color="inherit">
+                <Badge badgeContent={3} color="error">
+                  <NotificationsIcon />
+                </Badge>
+              </IconButton>
+            </Tooltip>
 
-          {/* Профиль пользователя */}
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1,
-              ml: 1,
-              cursor: 'pointer',
-              p: 1,
-              borderRadius: 1,
-              '&:hover': {
-                backgroundColor: 'action.hover',
-              },
-            }}
-            onClick={handleMenuOpen}
-          >
-            <Avatar
+            {/* Профиль пользователя */}
+            <Box
               sx={{
-                width: 36,
-                height: 36,
-                bgcolor: 'primary.main',
-                fontSize: '0.875rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                ml: 1,
+                cursor: 'pointer',
+                p: 1,
+                borderRadius: 1,
+                '&:hover': {
+                  backgroundColor: 'action.hover',
+                },
               }}
+              onClick={handleMenuOpen}
             >
-              {getInitials()}
-            </Avatar>
-            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
-                {authStore.fullName}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2 }}>
-                {getRoleLabel()}
-              </Typography>
+              <Avatar
+                sx={{
+                  width: 36,
+                  height: 36,
+                  bgcolor: 'primary.main',
+                  fontSize: '0.875rem',
+                }}
+              >
+                {getInitials()}
+              </Avatar>
+              <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+                  {authStore.fullName}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.2 }}>
+                  {getRoleLabel()}
+                </Typography>
+              </Box>
             </Box>
           </Box>
-        </Box>
 
-        {/* Меню профиля */}
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleMenuClose}
-          transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-          anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-          PaperProps={{
-            elevation: 3,
-            sx: { 
-              mt: 1.5,
-              minWidth: 220,
-            },
-          }}
-        >
-          <Box sx={{ px: 2, py: 1.5 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-              {authStore.fullName}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {authStore.user?.email}
-            </Typography>
-          </Box>
+          {/* Меню профиля */}
+          <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={handleMenuClose}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            PaperProps={{
+              elevation: 3,
+              sx: { 
+                mt: 1.5,
+                minWidth: 220,
+              },
+            }}
+          >
+            <Box sx={{ px: 2, py: 1.5 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                {authStore.fullName}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {authStore.user?.email}
+              </Typography>
+            </Box>
 
-          <Divider />
+            <Divider />
 
-          <MenuItem onClick={handleMenuClose}>
-            <ListItemIcon>
-              <AccountCircleIcon fontSize="small" />
-            </ListItemIcon>
-            Профиль
-          </MenuItem>
+            <MenuItem onClick={handleOpenProfile}>
+              <ListItemIcon>
+                <AccountCircleIcon fontSize="small" />
+              </ListItemIcon>
+              Профиль
+            </MenuItem>
 
-          <MenuItem onClick={handleMenuClose}>
-            <ListItemIcon>
-              <SettingsIcon fontSize="small" />
-            </ListItemIcon>
-            Настройки
-          </MenuItem>
+            <MenuItem onClick={handleMenuClose}>
+              <ListItemIcon>
+                <SettingsIcon fontSize="small" />
+              </ListItemIcon>
+              Настройки
+            </MenuItem>
 
-          <Divider />
+            <Divider />
 
-          <MenuItem onClick={handleLogout}>
-            <ListItemIcon>
-              <LogoutIcon fontSize="small" />
-            </ListItemIcon>
-            Выйти
-          </MenuItem>
-        </Menu>
-      </Toolbar>
-    </AppBar>
+            <MenuItem onClick={handleLogout}>
+              <ListItemIcon>
+                <LogoutIcon fontSize="small" />
+              </ListItemIcon>
+              Выйти
+            </MenuItem>
+          </Menu>
+        </Toolbar>
+      </AppBar>
+
+      {/* Profile Drawer */}
+      <ProfileDrawer 
+        open={profileDrawerOpen} 
+        onClose={() => setProfileDrawerOpen(false)} 
+      />
+    </>
   );
 });
