@@ -1,9 +1,9 @@
 
-import type { FC } from 'react';
+import { useState, type FC } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  Drawer,
+ Drawer,
   List,
   ListItemButton,
   ListItemIcon,
@@ -14,13 +14,21 @@ import {
   Typography,
   Badge,
   Tooltip,
+  Collapse
 } from '@mui/material';
 import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
+  ExpandLess,
+  ExpandMore,
+  SettingsOutlined,
+  PeopleOutlined,
+  DescriptionOutlined,
 } from '@mui/icons-material';
 import { useAuthStore } from '@features/auth/useAuthStore';
 import { getNavigationByRole } from './../Layout/navigationConfig';
+import { EmployeesDrawer } from '@widgets/Layout/EmployeesDrawer';
+import { DocumentsDrawer } from '@widgets/Layout/DocumentsDrawer';
 
 interface SidebarProps {
   open: boolean;
@@ -45,7 +53,20 @@ export const Sidebar: FC<SidebarProps> = observer(({
     navigate(path);
   };
 
+  // Состояние раскрытия секции "Дополнительно"
+  const [additionalOpen, setAdditionalOpen] = useState(false);
+  // Состояния для Drawer'ов
+  const [employeesDrawerOpen, setEmployeesDrawerOpen] = useState(false);
+  const [documentsDrawerOpen, setDocumentsDrawerOpen] = useState(false);
+
+  const handleToggleAdditional = () => {
+    setAdditionalOpen(!additionalOpen);
+  };
+
+
   return (
+    <>
+
     <Drawer
       variant="permanent"
       open={open}
@@ -160,6 +181,91 @@ export const Sidebar: FC<SidebarProps> = observer(({
           );
         })}
       </List>
+       <Divider />
+
+        {/* Дополнительный функционал - раскрывающаяся секция */}
+        <List sx={{ px: 1, py: 1 }}>
+          <Tooltip title={!open ? 'Дополнительно' : ''} placement="right">
+            <ListItemButton 
+              onClick={handleToggleAdditional}
+              sx={{ borderRadius: 1 }}
+            >
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <SettingsOutlined />
+              </ListItemIcon>
+              {open && (
+                <>
+                  <ListItemText 
+                    primary="Дополнительно"
+                    primaryTypographyProps={{
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                    }}
+                  />
+                  {additionalOpen ? <ExpandLess /> : <ExpandMore />}
+                </>
+              )}
+            </ListItemButton>
+          </Tooltip>
+
+          {/* Раскрывающийся список */}
+          {open && (
+            <Collapse in={additionalOpen} timeout="auto" unmountOnExit>
+              <List component="div" disablePadding>
+                {/* Сотрудники */}
+                <ListItemButton
+                  onClick={() => setEmployeesDrawerOpen(true)}
+                  sx={{
+                    pl: 4,
+                    borderRadius: 1,
+                    mb: 0.5,
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <PeopleOutlined />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Сотрудники"
+                    primaryTypographyProps={{
+                      fontSize: '0.875rem',
+                    }}
+                  />
+                </ListItemButton>
+
+                {/* Документы */}
+                <ListItemButton
+                  onClick={() => setDocumentsDrawerOpen(true)}
+                  sx={{
+                    pl: 4,
+                    borderRadius: 1,
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <DescriptionOutlined />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Документы"
+                    primaryTypographyProps={{
+                      fontSize: '0.875rem',
+                    }}
+                  />
+                </ListItemButton>
+              </List>
+            </Collapse>
+          )}
+        </List>
     </Drawer>
+    {/* Drawer для сотрудников */}
+      <EmployeesDrawer
+        open={employeesDrawerOpen}
+        onClose={() => setEmployeesDrawerOpen(false)}
+      />
+
+    {/* Drawer для документов */}
+    <DocumentsDrawer
+      open={documentsDrawerOpen}
+      onClose={() => setDocumentsDrawerOpen(false)}
+    />
+    </>
   );
 });
