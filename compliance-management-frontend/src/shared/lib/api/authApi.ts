@@ -1,5 +1,5 @@
 import { apiClient } from './apiClient';
-import type { AuthResponse, LoginCredentials } from '@shared/types/customTypes';
+import type { AuthResponse, LoginCredentials, RegisterCredentials } from '@shared/types/customTypes';
 
 export class AuthApi {
   static async login(credentials: LoginCredentials): Promise<AuthResponse> {
@@ -20,6 +20,10 @@ export class AuthApi {
 
   static async getCurrentUser(): Promise<AuthResponse['user']> {
     const response = await apiClient.get<AuthResponse['user']>('/auth/me');
+    return response.data;
+  }
+   static async register(credentials: RegisterCredentials): Promise<AuthResponse> {
+    const response = await apiClient.post<AuthResponse>('/auth/register', credentials);
     return response.data;
   }
 }

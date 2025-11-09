@@ -3,12 +3,11 @@ import type { FC, ReactNode } from 'react';
 import { observer } from 'mobx-react-lite';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@features/auth/useAuthStore';
-import { type UserRole } from '@shared/types/customTypes';
 import { UserRoleValues } from '@shared/types/customTypes';
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  allowedRoles?: UserRole[];
+  allowedRoles?: string[];
 }
 
 export const ProtectedRoute: FC<ProtectedRouteProps> = observer(
@@ -20,13 +19,19 @@ export const ProtectedRoute: FC<ProtectedRouteProps> = observer(
     if (!authStore.isAuthenticated) {
       return <Navigate to="/login" state={{ from: location }} replace />;
     }
-
     // Проверка ролей, если они указаны
     if (allowedRoles && authStore.userRole) {
       if (!allowedRoles.includes(authStore.userRole)) {
         // Редирект на дашборд соответствующей роли
-        const dashboardPath = getRoleDashboardPath(authStore.userRole);
-        return <Navigate to={dashboardPath} replace />;
+        let targetPath = "dashboard";
+
+        if(authStore.isFirstLogin){
+          targetPath =  getRolePath(authStore.userRole, "help");
+        }else{
+          targetPath =  getRolePath(authStore.userRole, "dashboard");
+        }
+      
+        return <Navigate to={targetPath} replace />;
       }
     }
 
@@ -35,14 +40,14 @@ export const ProtectedRoute: FC<ProtectedRouteProps> = observer(
 );
 
 // Вспомогательная функция для получения пути дашборда по роли
-function getRoleDashboardPath(role: UserRole): string {
+function getRolePath(role: string, source: string): string {
   switch (role) {
     case UserRoleValues.MANAGER:
-      return '/manager/dashboard';
+      return '/manager/'+source;
     case UserRoleValues.SUPERVISOR:
-      return '/supervisor/dashboard';
+      return '/supervisor/'+source;
     case UserRoleValues.EXECUTIVE:
-      return '/executive/dashboard';
+      return '/executive/'+source;
     default:
       return '/';
   }

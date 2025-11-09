@@ -1,23 +1,25 @@
-import { useState, type FC, type FormEvent } from 'react';
+import { type FC, useState, type FormEvent } from 'react';
 import { observer } from 'mobx-react-lite';
 import {
   Box,
   TextField,
   Button,
+  Typography,
   Alert,
   CircularProgress,
   InputAdornment,
   IconButton,
-  FormControl,
+  Stack,
+  Divider,
 } from '@mui/material';
-import { 
-  Visibility, 
-  VisibilityOff, 
-  LoginOutlined 
+import {
+  Visibility,
+  VisibilityOff,
+  LoginOutlined,
+  PersonAddOutlined,
 } from '@mui/icons-material';
-import { useAuthStore } from '@features/auth/useAuthStore';
+import { useAuthStore } from '../useAuthStore';
 import { useNavigate } from 'react-router-dom';
-import { UserRoleValues } from '@shared/types/customTypes';
 
 export const LoginForm: FC = observer(() => {
   const authStore = useAuthStore();
@@ -26,89 +28,79 @@ export const LoginForm: FC = observer(() => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [emailError, setEmailError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  const [errors, setErrors] = useState({ email: '', password: '' });
 
   // Валидация email
-  const validateEmail = (value: string): boolean => {
-    if (!value) {
-      setEmailError('Email обязателен для заполнения');
-      return false;
-    }
+  const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(value)) {
-      setEmailError('Некорректный формат email');
-      return false;
-    }
-    setEmailError('');
-    return true;
+    return emailRegex.test(email);
   };
 
   // Валидация пароля
-  const validatePassword = (value: string): boolean => {
-    if (!value) {
-      setPasswordError('Пароль обязателен для заполнения');
-      return false;
-    }
-    if (value.length < 6) {
-      setPasswordError('Пароль должен содержать минимум 6 символов');
-      return false;
-    }
-    setPasswordError('');
-    return true;
+  const validatePassword = (password: string) => {
+    return password.length >= 6;
   };
 
-  const handleEmailChange = (value: string) => {
+  // Обработка изменения email
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
     setEmail(value);
-    if (emailError) {
-      validateEmail(value);
+
+    if (value && !validateEmail(value)) {
+      setErrors(prev => ({ ...prev, email: 'Некорректный email адрес' }));
+    } else {
+      setErrors(prev => ({ ...prev, email: '' }));
     }
   };
 
-  const handlePasswordChange = (value: string) => {
+  // Обработка изменения пароля
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
     setPassword(value);
-    if (passwordError) {
-      validatePassword(value);
+
+    if (value && !validatePassword(value)) {
+      setErrors(prev => ({ ...prev, password: 'Пароль должен быть не менее 6 символов' }));
+    } else {
+      setErrors(prev => ({ ...prev, password: '' }));
     }
   };
 
+  // Обработка отправки формы
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    // Очистка предыдущих ошибок
-    authStore.clearError();
+    // Валидация перед отправкой
+    if (!email || !password) {
+      if (!email) setErrors(prev => ({ ...prev, email: 'Введите email' }));
+      if (!password) setErrors(prev => ({ ...prev, password: 'Введите пароль' }));
+      return;
+    }
 
-    // Валидация полей
-    const isEmailValid = validateEmail(email);
-    const isPasswordValid = validatePassword(password);
+    if (!validateEmail(email)) {
+      setErrors(prev => ({ ...prev, email: 'Некорректный email адрес' }));
+      return;
+    }
 
-    if (!isEmailValid || !isPasswordValid) {
+    if (!validatePassword(password)) {
+      setErrors(prev => ({ ...prev, password: 'Пароль должен быть не менее 6 символов' }));
       return;
     }
 
     try {
-      const user = await authStore.login({ email, password });
-
-      // Редирект в зависимости от роли пользователя
-      switch (user.role) {
-        case UserRoleValues.MANAGER:
-          navigate('/manager/dashboard');
-          break;
-        case UserRoleValues.SUPERVISOR:
-          navigate('/supervisor/dashboard');
-          break;
-        case UserRoleValues.EXECUTIVE:
-          navigate('/executive/dashboard');
-          break;
-        default:
-          navigate('/');
-      }
+      await authStore.login({ email, password });
+      // Навигация происходит автоматически через ProtectedRoute
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('Login error:', error);
     }
   };
 
-  const isFormValid = email && password && !emailError && !passwordError;
+  // Переход на страницу регистрации
+  const handleGoToRegister = () => {
+    navigate('/register');
+  };
+
+  const hasErrors = errors.email || errors.password;
+  const isFormValid = email && password && !hasErrors;
 
   return (
     <Box
@@ -117,58 +109,49 @@ export const LoginForm: FC = observer(() => {
       sx={{
         width: '100%',
         maxWidth: 400,
+        mx: 'auto',
       }}
     >
+      {/* Общая ошибка от сервера */}
       {authStore.error && (
-        <Alert 
-          severity="error" 
-          sx={{ mb: 2 }}
-          onClose={() => authStore.clearError()}
-        >
+        <Alert severity="error" sx={{ mb: 3 }}>
           {authStore.error}
         </Alert>
       )}
 
-      <FormControl fullWidth margin="normal">
+      <Stack spacing={2.5}>
+        {/* Email поле */}
         <TextField
-          fullWidth
           label="Email"
           type="email"
           value={email}
-          onChange={(e) => handleEmailChange(e.target.value)}
-          onBlur={() => validateEmail(email)}
-          error={!!emailError}
-          helperText={emailError}
+          onChange={handleEmailChange}
+          error={Boolean(errors.email)}
+          helperText={errors.email}
+          fullWidth
           required
           autoComplete="email"
           autoFocus
-          disabled={authStore.isLoading}
-          placeholder="user@example.com"
         />
-      </FormControl>
 
-      <FormControl fullWidth margin="normal">
+        {/* Пароль поле */}
         <TextField
-          fullWidth
           label="Пароль"
           type={showPassword ? 'text' : 'password'}
           value={password}
-          onChange={(e) => handlePasswordChange(e.target.value)}
-          onBlur={() => validatePassword(password)}
-          error={!!passwordError}
-          helperText={passwordError}
+          onChange={handlePasswordChange}
+          error={Boolean(errors.password)}
+          helperText={errors.password}
+          fullWidth
           required
           autoComplete="current-password"
-          disabled={authStore.isLoading}
-          placeholder="Введите пароль"
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
                 <IconButton
                   onClick={() => setShowPassword(!showPassword)}
                   edge="end"
-                  disabled={authStore.isLoading}
-                  aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                  aria-label="toggle password visibility"
                 >
                   {showPassword ? <VisibilityOff /> : <Visibility />}
                 </IconButton>
@@ -176,25 +159,64 @@ export const LoginForm: FC = observer(() => {
             ),
           }}
         />
-      </FormControl>
 
-      <Button
-        type="submit"
-        fullWidth
-        variant="contained"
-        size="large"
-        disabled={authStore.isLoading || !isFormValid}
-        startIcon={authStore.isLoading ? <CircularProgress size={20} color="inherit" /> : <LoginOutlined />}
-        sx={{ 
-          mt: 3, 
-          mb: 2,
-          py: 1.5,
-          textTransform: 'none',
-          fontSize: '1rem',
-        }}
-      >
-        {authStore.isLoading ? 'Вход...' : 'Войти в систему'}
-      </Button>
+        {/* Кнопка входа */}
+        <Button
+          type="submit"
+          variant="contained"
+          size="large"
+          fullWidth
+          disabled={!isFormValid || authStore.isLoading}
+          startIcon={authStore.isLoading ? <CircularProgress size={20} color="inherit" /> : <LoginOutlined />}
+          sx={{
+            mt: 1,
+            py: 1.5,
+            fontSize: '1rem',
+            fontWeight: 600,
+          }}
+        >
+          {authStore.isLoading ? 'Вход...' : 'Войти'}
+        </Button>
+
+        {/* Разделитель */}
+        <Divider sx={{ my: 2 }}>или</Divider>
+
+        {/* Кнопка регистрации */}
+        <Button
+          variant="outlined"
+          size="large"
+          fullWidth
+          onClick={handleGoToRegister}
+          startIcon={<PersonAddOutlined />}
+          sx={{
+            py: 1.5,
+            fontSize: '1rem',
+            fontWeight: 600,
+            borderWidth: 2,
+            '&:hover': {
+              borderWidth: 2,
+            },
+          }}
+        >
+          Создать аккаунт
+        </Button>
+      </Stack>
+
+      {/* Демо-доступы */}
+      <Box sx={{ mt: 4, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+        <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
+          Демо-доступы для тестирования:
+        </Typography>
+        <Typography variant="caption" component="div" color="text.secondary">
+          • Менеджер: manager@example.com / password123
+        </Typography>
+        <Typography variant="caption" component="div" color="text.secondary">
+          • Руководитель: supervisor@example.com / password123
+        </Typography>
+        <Typography variant="caption" component="div" color="text.secondary">
+          • Топ-менеджмент: executive@example.com / password123
+        </Typography>
+      </Box>
     </Box>
   );
 });

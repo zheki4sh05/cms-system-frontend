@@ -11,6 +11,7 @@ export const mockUsers: Array<User & { password: string }> = [
     lastName: 'Менеджеров',
     role: UserRoleValues.MANAGER,
     departmentId: 'dept-001',
+    isFirstLogin: false
   },
   {
     id: '2',

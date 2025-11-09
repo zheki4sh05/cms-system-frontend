@@ -29,6 +29,10 @@ import { ProtectedRoute } from '@shared/lib/hooks/ProtectedRoute';
 import { UserRoleValues } from '@shared/types/customTypes';
 import { AppLayout } from '@widgets/Layout/AppLayout';
 import { SupervisorRulesPage } from '@pages/supervisor/RulesPage/SupervisorRulesPage';
+import { RegisterPage } from '@pages/auth/RegisterPage/RegisterPage';
+import { ManagerHelpPage } from '@pages/help/ManagerHelpPage';
+import { SupervisorHelpPage } from '@pages/help/SuperVisorHelpPage';
+import { ExecutiveHelpPage } from '@pages/help/ExecutiveHelpPage';
 
 export const RouterProvider: FC = observer(() => {
   return (
@@ -37,6 +41,7 @@ export const RouterProvider: FC = observer(() => {
         {/* Public routes */}
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
 
         {/* Manager routes with Layout */}
         <Route
@@ -49,6 +54,7 @@ export const RouterProvider: FC = observer(() => {
                   <Route path="incidents" element={<ManagerIncidentsPage />} />
                   <Route path="cases" element={<ManagerCasesPage />} />
                   <Route path="tasks" element={<ManagerTasksPage />} />
+                  <Route path="help" element={<ManagerHelpPage />} />
                 </Routes>
               </AppLayout>
             </ProtectedRoute>
@@ -67,6 +73,7 @@ export const RouterProvider: FC = observer(() => {
                   <Route path="incidents" element={<SupervisorIncidentsPage />} />
                   <Route path="analytics" element={<SupervisorAnalyticsPage />} />
                   <Route path="rules" element={<SupervisorRulesPage />} />
+                   <Route path="help" element={<SupervisorHelpPage />} />
                 </Routes>
               </AppLayout>
             </ProtectedRoute>
@@ -82,6 +89,7 @@ export const RouterProvider: FC = observer(() => {
                 <Routes>
                   <Route path="dashboard" element={<ExecutiveDashboardPage />} />
                   <Route path="reports" element={<ExecutiveReportsPage />} />
+                    <Route path="help" element={<ExecutiveHelpPage />} />
                 </Routes>
               </AppLayout>
             </ProtectedRoute>

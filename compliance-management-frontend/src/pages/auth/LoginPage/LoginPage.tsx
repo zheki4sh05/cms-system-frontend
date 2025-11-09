@@ -6,8 +6,7 @@ import {
   Container, 
   Typography, 
   Paper, 
-  Divider,
-  Alert
+  Divider
 } from '@mui/material';
 import { LoginForm } from '@features/auth/ui/LoginForm';
 import { useAuthStore } from '@features/auth/useAuthStore';
@@ -87,21 +86,6 @@ export const LoginPage: FC = observer(() => {
           <Divider sx={{ width: '100%', mb: 3 }} />
 
           <LoginForm />
-
-          <Divider sx={{ width: '100%', my: 3 }} />
-
-          <Alert severity="info" sx={{ width: '100%' }}>
-            <Typography variant="body2">
-              <strong>Демо-доступы для тестирования:</strong>
-            </Typography>
-            <Typography variant="caption" component="div" sx={{ mt: 1 }}>
-              • Менеджер: manager@example.com / password123
-              <br />
-              • Руководитель: supervisor@example.com / password123
-              <br />
-              • Топ-менеджмент: executive@example.com / password123
-            </Typography>
-          </Alert>
         </Paper>
 
         <Typography 

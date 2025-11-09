@@ -1,7 +1,8 @@
 
 import { http, HttpResponse, delay } from 'msw';
 import { mockUsers, generateMockTokens, getUserByToken } from './mockData';
-import type { LoginCredentials, AuthResponse } from '@shared/types/customTypes';
+import { type LoginCredentials, type AuthResponse, UserRoleValues } from '@shared/types/customTypes';
+import type {User} from '../shared/types/customTypes'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
@@ -124,4 +125,38 @@ export const handlers = [
 
     return HttpResponse.json(user, { status: 200 });
   }),
+
+  // POST /auth/register - Регистрация
+http.post(`${API_BASE_URL}/auth/register`, async ({ request }) => {
+  await delay(700);
+  const body = await request.json() as {email: string, password: string, firstName: string, lastName: string, role: string, departmentId: string};
+  const existing = mockUsers.find(u => u.email === body.email);
+  if (existing) {
+    return HttpResponse.json(
+      { message: 'Пользователь с таким email уже существует', code: 'DUPLICATE_EMAIL' },
+      { status: 409 }
+    );
+  }
+  const id = (Math.max(...mockUsers.map(u => +u.id || 0), 0) + 1).toString();
+  // Имплементация isFirstLogin=true!
+  const user: User & { password: string }  = {
+    id,
+    email: body.email,
+    firstName: body.firstName,
+    lastName: body.lastName,
+    role:'EXECUTIVE',
+    departmentId: body.departmentId,
+    isFirstLogin: true,
+    password: body.password,
+  };
+  mockUsers.push(user);
+  const tokens = generateMockTokens(id);
+  const {...userWithoutPassword } = user;
+  const response = {
+    user: userWithoutPassword,
+    tokens,
+  };
+  return HttpResponse.json(response, { status: 201 });
+}),
+
 ];

@@ -4,7 +4,6 @@ import {
   ReportProblemOutlined,
   FolderOpenOutlined,
   AssignmentOutlined,
-  PeopleOutlined,
   AnalyticsOutlined,
   RuleOutlined,
   DescriptionOutlined,

@@ -1,13 +1,13 @@
 import { makeAutoObservable, runInAction } from 'mobx';
-import type { User, LoginCredentials, UserRole } from '@shared/types/customTypes';
+import { AuthApi } from '@shared/lib/api/authApi';
+import { type User, type LoginCredentials } from '@shared/types/customTypes';
 import { UserRoleValues } from '@shared/types/customTypes';
-import { AuthApi } from './../../../shared/lib/api/authApi';
-
 export class AuthStore {
   user: User | null = null;
   isAuthenticated: boolean = false;
   isLoading: boolean = false;
   error: string | null = null;
+  shouldShowProfile: boolean = false;  // Флаг для показа профиля при входе
 
   constructor(private rootStore?: any) {
     makeAutoObservable(this, {}, { autoBind: true });
@@ -63,6 +63,8 @@ export class AuthStore {
         this.isAuthenticated = true;
         this.isLoading = false;
 
+        // Если это НЕ первый вход - показываем профиль
+        this.shouldShowProfile = !response.user.isFirstLogin;
         // Сохранение токенов и данных пользователя
         localStorage.setItem('accessToken', response.tokens.accessToken);
         localStorage.setItem('refreshToken', response.tokens.refreshToken);
@@ -79,6 +81,52 @@ export class AuthStore {
     }
   }
 
+  // Регистрация нового пользователя
+  async register(credentials: any) {
+    this.isLoading = true;
+    this.error = null;
+
+    try {
+      const response = await AuthApi.register(credentials);
+
+      runInAction(() => {
+        this.user = response.user;
+        this.isAuthenticated = true;
+        this.isLoading = false;
+
+        // При регистрации НЕ показываем профиль (будет редирект на помощь)
+        this.shouldShowProfile = false;
+
+        // Сохранение токенов и данных пользователя
+        localStorage.setItem('accessToken', response.tokens.accessToken);
+        localStorage.setItem('refreshToken', response.tokens.refreshToken);
+        localStorage.setItem('user', JSON.stringify(response.user));
+      });
+
+      return response.user;
+    } catch (error: any) {
+      runInAction(() => {
+        this.error = error.response?.data?.message || 'Ошибка регистрации';
+        this.isLoading = false;
+      });
+      throw error;
+    }
+  }
+
+  // Отметить, что пользователь больше не новичок
+  markAsReturningUser() {
+    if (this.user) {
+      const updatedUser = { ...this.user, isFirstLogin: false };
+      this.user = updatedUser;
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+  }
+
+  // Сбросить флаг показа профиля
+  resetShowProfile() {
+    this.shouldShowProfile = false;
+  }
+
   // Выход из системы
   async logout() {
     try {
@@ -90,6 +138,7 @@ export class AuthStore {
         this.user = null;
         this.isAuthenticated = false;
         this.error = null;
+        this.shouldShowProfile = false;
 
         // Очистка локального хранилища
         localStorage.removeItem('accessToken');
@@ -100,12 +149,12 @@ export class AuthStore {
   }
 
   // Получение роли пользователя
-  get userRole(): UserRole | null {
+  get userRole(): string | null {
     return this.user?.role || null;
   }
 
   // Проверка роли
-  hasRole(role: UserRole): boolean {
+  hasRole(role: string): boolean {
     return this.userRole === role;
   }
 
@@ -128,6 +177,11 @@ export class AuthStore {
   get fullName(): string {
     if (!this.user) return '';
     return `${this.user.firstName} ${this.user.lastName}`;
+  }
+
+  // Проверка первого входа
+  get isFirstLogin(): boolean {
+    return this.user?.isFirstLogin ?? false;
   }
 
   // Очистка ошибки
