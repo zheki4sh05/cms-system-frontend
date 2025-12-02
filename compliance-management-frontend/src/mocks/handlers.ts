@@ -3,6 +3,19 @@ import { http, HttpResponse, delay } from 'msw';
 import { mockUsers, generateMockTokens, getUserByToken } from './mockData';
 import { type LoginCredentials, type AuthResponse, UserRoleValues } from '@shared/types/customTypes';
 import type {User} from '../shared/types/customTypes'
+import type {
+  Case,
+  CaseStatus,
+  CaseSeverity,
+  CasePriority,
+  CaseComment,
+  CaseAttachment,
+  CreateCaseRequest,
+  UpdateCaseRequest,
+} from '@shared/types/caseTypes';
+import { tasksHandlers } from './handlers/taskHandler'; 
+import { incidentsHandlers } from './handlers/incidentMocks';
+
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
@@ -38,6 +51,267 @@ const mockDepartments: any[] = [
     employeeCount: 8,
     createdAt: '2024-06-10T00:00:00Z',
     updatedAt: '2025-11-05T00:00:00Z',
+  },
+];
+
+const mockManagerStats = {
+  newIncidents: 12,
+  urgentIncidents: 3,
+  incidentsTrend: 15, // +15%
+  activeCases: 8,
+  closedCases: 24,
+  myTasks: 15,
+  completedTasks: 42,
+  overdueTasks: 2,
+  performanceScore: 87,
+  avgProcessingTime: 4.5,
+};
+
+const mockRecentActivities = [
+  {
+    id: 'activity-1',
+    type: 'INCIDENT' as const,
+    title: 'Новый инцидент: Превышение бюджета закупки',
+    description: 'Закупка №12345 превышает утвержденный бюджет на 15%',
+    timestamp: '5 минут назад',
+    severity: 'HIGH' as const,
+  },
+  {
+    id: 'activity-2',
+    type: 'CASE' as const,
+    title: 'Случай обновлен: Дублирование поставщика',
+    description: 'Добавлено новое доказательство',
+    timestamp: '1 час назад',
+  },
+  {
+    id: 'activity-3',
+    type: 'TASK' as const,
+    title: 'Задача завершена: Проверить контрагента',
+    description: 'Контрагент проверен, нарушений не выявлено',
+    timestamp: '2 часа назад',
+  },
+  {
+    id: 'activity-4',
+    type: 'INCIDENT' as const,
+    title: 'Инцидент закрыт: Конфликт интересов',
+    description: 'Инцидент признан ложным срабатыванием',
+    timestamp: '3 часа назад',
+    severity: 'MEDIUM' as const,
+  },
+  {
+    id: 'activity-5',
+    type: 'NOTIFICATION' as const,
+    title: 'Новое уведомление от руководителя',
+    description: 'План корректирующих действий утвержден',
+    timestamp: '4 часа назад',
+  },
+  {
+    id: 'activity-6',
+    type: 'CASE' as const,
+    title: 'Новый случай назначен',
+    description: 'Случай №CS-2024-156 требует расследования',
+    timestamp: '5 часов назад',
+  },
+];
+
+const mockUpcomingTasks = [
+  {
+    id: 'task-1',
+    title: 'Подготовить отчет по инциденту ИН-2024-789',
+    dueDate: '2024-12-02T18:00:00Z',
+    dueIn: 'Сегодня',
+    priority: 'URGENT' as const,
+    isOverdue: false,
+    caseId: 'case-123',
+  },
+  {
+    id: 'task-2',
+    title: 'Проверить документы поставщика ООО "Альфа"',
+    dueDate: '2024-12-01T15:00:00Z',
+    dueIn: 'Просрочено на 1 день',
+    priority: 'HIGH' as const,
+    isOverdue: true,
+    caseId: 'case-124',
+  },
+  {
+    id: 'task-3',
+    title: 'Согласовать план корректирующих действий',
+    dueDate: '2024-12-03T12:00:00Z',
+    dueIn: 'Завтра',
+    priority: 'HIGH' as const,
+    isOverdue: false,
+    caseId: 'case-125',
+  },
+  {
+    id: 'task-4',
+    title: 'Провести анализ закупок за ноябрь',
+    dueDate: '2024-12-05T17:00:00Z',
+    dueIn: '3 дня',
+    priority: 'NORMAL' as const,
+    isOverdue: false,
+  },
+  {
+    id: 'task-5',
+    title: 'Обновить профиль риска контрагента',
+    dueDate: '2024-12-06T10:00:00Z',
+    dueIn: '4 дня',
+    priority: 'LOW' as const,
+    isOverdue: false,
+    caseId: 'case-126',
+  },
+];
+
+
+// Моковые данные случаев
+let mockCases: Case[] = [
+  {
+    id: 'CS-2024-001',
+    title: 'Превышение бюджета закупки на 23%',
+    description: 'Обнаружено превышение утвержденного бюджета при закупке офисной техники. Сумма превышения составляет 450 000 руб.',
+    status: 'INVESTIGATION' as CaseStatus,
+    severity: 'HIGH' as CaseSeverity,
+    priority: 'HIGH' as CasePriority,
+    ownerId: '1',
+    ownerName: 'Иван Иванов',
+    createdAt: '2024-11-28T10:00:00Z',
+    updatedAt: '2024-12-01T15:30:00Z',
+    dueDate: '2024-12-10T23:59:59Z',
+    incidentIds: ['INC-2024-123', 'INC-2024-124'],
+    tags: ['финансы', 'бюджет', 'закупки'],
+    investigationNotes: 'Проведен анализ документов. Выявлено изменение цен поставщиком после согласования.',
+    rootCause: 'Отсутствие механизма контроля изменения цен после согласования бюджета',
+    requiresCorrectiveAction: true,
+  },
+  {
+    id: 'CS-2024-002',
+    title: 'Дублирование записей поставщика ООО "Альфа"',
+    description: 'В базе данных обнаружено три записи для одного и того же поставщика с разными идентификаторами.',
+    status: 'IN_PROGRESS' as CaseStatus,
+    severity: 'MEDIUM' as CaseSeverity,
+    priority: 'NORMAL' as CasePriority,
+    ownerId: '1',
+    ownerName: 'Иван Иванов',
+    createdAt: '2024-11-25T09:00:00Z',
+    updatedAt: '2024-11-30T14:20:00Z',
+    dueDate: '2024-12-05T23:59:59Z',
+    incidentIds: ['INC-2024-110'],
+    tags: ['контрагенты', 'данные'],
+    investigationNotes: 'Записи созданы разными сотрудниками в разное время. Требуется объединение.',
+    requiresCorrectiveAction: false,
+  },
+  {
+    id: 'CS-2024-003',
+    title: 'Подозрение на конфликт интересов',
+    description: 'Менеджер проводит закупки у компании, где он является совладельцем согласно данным ЕГРЮЛ.',
+    status: 'OPEN' as CaseStatus,
+    severity: 'CRITICAL' as CaseSeverity,
+    priority: 'URGENT' as CasePriority,
+    ownerId: '1',
+    ownerName: 'Иван Иванов',
+    createdAt: '2024-12-01T11:00:00Z',
+    updatedAt: '2024-12-01T11:00:00Z',
+    dueDate: '2024-12-03T23:59:59Z',
+    incidentIds: ['INC-2024-156'],
+    tags: ['комплаенс', 'этика', 'критично'],
+    requiresCorrectiveAction: false,
+  },
+  {
+    id: 'CS-2024-004',
+    title: 'Систематические задержки поставок',
+    description: 'Поставщик ООО "Бета" систематически нарушает сроки поставки (7 случаев за 3 месяца).',
+    status: 'PENDING_VERIFICATION' as CaseStatus,
+    severity: 'LOW' as CaseSeverity,
+    priority: 'NORMAL' as CasePriority,
+    ownerId: '1',
+    ownerName: 'Иван Иванов',
+    createdAt: '2024-11-20T08:00:00Z',
+    updatedAt: '2024-11-29T16:45:00Z',
+    dueDate: '2024-12-08T23:59:59Z',
+    incidentIds: ['INC-2024-098', 'INC-2024-105', 'INC-2024-112'],
+    tags: ['логистика', 'поставщик'],
+    investigationNotes: 'Проведена встреча с поставщиком. Выявлены проблемы с производственными мощностями.',
+    rootCause: 'Недостаточная производственная мощность поставщика для выполнения обязательств',
+    requiresCorrectiveAction: true,
+    actionPlanId: 'AP-2024-001',
+  },
+  {
+    id: 'CS-2024-005',
+    title: 'Закрытый случай: Ложное срабатывание правила',
+    description: 'Правило сработало на допустимое исключение, утвержденное руководством.',
+    status: 'CLOSED' as CaseStatus,
+    severity: 'LOW' as CaseSeverity,
+    priority: 'LOW' as CasePriority,
+    ownerId: '1',
+    ownerName: 'Иван Иванов',
+    createdAt: '2024-11-15T10:00:00Z',
+    updatedAt: '2024-11-16T12:00:00Z',
+    incidentIds: ['INC-2024-067'],
+    tags: ['система', 'настройка'],
+    investigationNotes: 'Подтверждено наличие утверждения от руководства.',
+    rootCause: 'Правило не учитывает исключения, утвержденные руководством',
+    requiresCorrectiveAction: false,
+  },
+];
+
+// Комментарии к случаям
+let mockComments: CaseComment[] = [
+  {
+    id: 'comment-1',
+    caseId: 'CS-2024-001',
+    authorId: '1',
+    authorName: 'Иван Иванов',
+    content: 'Запросил документы у отдела закупок. Ожидаю ответа в течение 2 рабочих дней.',
+    createdAt: '2024-11-28T14:30:00Z',
+  },
+  {
+    id: 'comment-2',
+    caseId: 'CS-2024-001',
+    authorId: '1',
+    authorName: 'Иван Иванов',
+    content: 'Получены документы. Подтверждено, что поставщик изменил цены после согласования без уведомления.',
+    createdAt: '2024-11-29T10:15:00Z',
+  },
+  {
+    id: 'comment-3',
+    caseId: 'CS-2024-002',
+    authorId: '1',
+    authorName: 'Иван Иванов',
+    content: 'Связался с IT-отделом для технической проверки возможности объединения записей.',
+    createdAt: '2024-11-26T09:45:00Z',
+  },
+];
+
+// Вложения к случаям
+let mockAttachments: CaseAttachment[] = [
+  {
+    id: 'attach-1',
+    caseId: 'CS-2024-001',
+    fileName: 'Договор_поставки_123.pdf',
+    fileUrl: '/files/contract_123.pdf',
+    fileSize: 245000,
+    fileType: 'application/pdf',
+    uploadedBy: 'Иван Иванов',
+    uploadedAt: '2024-11-28T15:00:00Z',
+  },
+  {
+    id: 'attach-2',
+    caseId: 'CS-2024-001',
+    fileName: 'Скан_счета_на_оплату.jpg',
+    fileUrl: '/files/invoice_scan.jpg',
+    fileSize: 1200000,
+    fileType: 'image/jpeg',
+    uploadedBy: 'Иван Иванов',
+    uploadedAt: '2024-11-29T11:30:00Z',
+  },
+  {
+    id: 'attach-3',
+    caseId: 'CS-2024-003',
+    fileName: 'Выписка_ЕГРЮЛ.pdf',
+    fileUrl: '/files/egrul.pdf',
+    fileSize: 340000,
+    fileType: 'application/pdf',
+    uploadedBy: 'Иван Иванов',
+    uploadedAt: '2024-12-01T12:00:00Z',
   },
 ];
 
@@ -530,5 +804,245 @@ http.post(`${API_BASE_URL}/departments/:id/manager`, async ({ request, params })
 
   return HttpResponse.json(mockDepartments[index]);
 }),
+
+  // GET /dashboard/manager/stats - Статистика для менеджера
+  http.get(`${API_BASE_URL}/dashboard/manager/stats`, async () => {
+    await delay(500);
+    console.log('📊 [MSW] Fetching manager dashboard stats');
+    return HttpResponse.json(mockManagerStats);
+  }),
+
+  // GET /dashboard/manager/activities - Последние активности
+  http.get(`${API_BASE_URL}/dashboard/manager/activities`, async () => {
+    await delay(400);
+    console.log('📋 [MSW] Fetching recent activities');
+    return HttpResponse.json(mockRecentActivities);
+  }),
+
+  // GET /dashboard/manager/tasks - Предстоящие задачи
+  http.get(`${API_BASE_URL}/dashboard/manager/tasks`, async () => {
+    await delay(300);
+    console.log('✅ [MSW] Fetching upcoming tasks');
+    return HttpResponse.json(mockUpcomingTasks);
+  }),
+
+  // GET /dashboard/supervisor/stats - Статистика для руководителя
+  http.get(`${API_BASE_URL}/dashboard/supervisor/stats`, async () => {
+    await delay(500);
+    console.log('📊 [MSW] Fetching supervisor dashboard stats');
+    return HttpResponse.json({
+      ...mockManagerStats,
+      teamMembers: 8,
+      teamPerformance: 85,
+      pendingVerifications: 5,
+    });
+  }),
+
+  // GET /dashboard/executive/stats - Статистика для топ-менеджмента
+  http.get(`${API_BASE_URL}/dashboard/executive/stats`, async () => {
+    await delay(500);
+    console.log('📊 [MSW] Fetching executive dashboard stats');
+    return HttpResponse.json({
+      totalRisk: 65,
+      financialImpact: 2500000,
+      topRiskAreas: ['Закупки', 'Контрагенты', 'Финансы'],
+      complianceScore: 92,
+    });
+  }),
+  // GET /cases/my - Получить мои случаи
+  http.get(`${API_BASE_URL}/cases/my`, async () => {
+    await delay(400);
+    console.log('📁 [MSW] Fetching my cases');
+    return HttpResponse.json(mockCases);
+  }),
+
+  // GET /cases/statistics - Статистика по случаям
+  http.get(`${API_BASE_URL}/cases/statistics`, async () => {
+    await delay(300);
+    console.log('📊 [MSW] Fetching case statistics');
+    
+    const statistics = {
+      total: mockCases.length,
+      open: mockCases.filter(c => c.status === 'OPEN').length,
+      inProgress: mockCases.filter(c => c.status === 'IN_PROGRESS').length,
+      investigation: mockCases.filter(c => c.status === 'INVESTIGATION').length,
+      pendingVerification: mockCases.filter(c => c.status === 'PENDING_VERIFICATION').length,
+      closed: mockCases.filter(c => c.status === 'CLOSED').length,
+      avgResolutionTime: 48, // В часах
+    };
+    
+    return HttpResponse.json(statistics);
+  }),
+
+  // GET /cases/:caseId - Получить случай по ID
+  http.get(`${API_BASE_URL}/cases/:caseId`, async ({ params }) => {
+    await delay(300);
+    const { caseId } = params;
+    console.log(`📄 [MSW] Fetching case: ${caseId}`);
+    
+    const caseItem = mockCases.find(c => c.id === caseId);
+    
+    if (!caseItem) {
+      return HttpResponse.json(
+        { message: 'Случай не найден', code: 'CASE_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+    
+    return HttpResponse.json(caseItem);
+  }),
+
+  // POST /cases - Создать новый случай
+  http.post(`${API_BASE_URL}/cases`, async ({ request }) => {
+    await delay(500);
+    const body = await request.json() as CreateCaseRequest;
+    console.log('➕ [MSW] Creating new case:', body);
+    
+    const newCase: Case = {
+      id: `CS-2024-${String(mockCases.length + 1).padStart(3, '0')}`,
+      title: body.title,
+      description: body.description,
+      status: 'OPEN' as CaseStatus,
+      severity: body.severity,
+      priority: body.priority,
+      ownerId: '1',
+      ownerName: 'Иван Иванов',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // +14 дней
+      incidentIds: body.incidentIds || [],
+      tags: body.tags || [],
+      requiresCorrectiveAction: false,
+    };
+    
+    mockCases.push(newCase);
+    return HttpResponse.json(newCase, { status: 201 });
+  }),
+
+  // PATCH /cases/:caseId - Обновить случай
+  http.patch(`${API_BASE_URL}/cases/:caseId`, async ({ request, params }) => {
+    await delay(400);
+    const { caseId } = params;
+    const body = await request.json() as UpdateCaseRequest;
+    console.log(`✏️ [MSW] Updating case ${caseId}:`, body);
+    
+    const index = mockCases.findIndex(c => c.id === caseId);
+    
+    if (index === -1) {
+      return HttpResponse.json(
+        { message: 'Случай не найден', code: 'CASE_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+    
+    mockCases[index] = {
+      ...mockCases[index],
+      ...body,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    return HttpResponse.json(mockCases[index]);
+  }),
+
+  // POST /cases/:caseId/close - Закрыть случай
+  http.post(`${API_BASE_URL}/cases/:caseId/close`, async ({ request, params }) => {
+    await delay(400);
+    const { caseId } = params;
+    const body = await request.json() as { conclusion: string };
+    console.log(`✅ [MSW] Closing case ${caseId}`);
+    
+    const index = mockCases.findIndex(c => c.id === caseId);
+    
+    if (index === -1) {
+      return HttpResponse.json(
+        { message: 'Случай не найден', code: 'CASE_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+    
+    mockCases[index] = {
+      ...mockCases[index],
+      status: 'CLOSED' as CaseStatus,
+      rootCause: body.conclusion,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    return HttpResponse.json(mockCases[index]);
+  }),
+
+  // GET /cases/:caseId/comments - Получить комментарии к случаю
+  http.get(`${API_BASE_URL}/cases/:caseId/comments`, async ({ params }) => {
+    await delay(300);
+    const { caseId } = params;
+    console.log(`💬 [MSW] Fetching comments for case: ${caseId}`);
+    
+    const comments = mockComments.filter(c => c.caseId === caseId);
+    return HttpResponse.json(comments);
+  }),
+
+  // POST /cases/:caseId/comments - Добавить комментарий
+  http.post(`${API_BASE_URL}/cases/:caseId/comments`, async ({ request, params }) => {
+    await delay(400);
+    const { caseId } = params;
+    const body = await request.json() as { content: string };
+    console.log(`💬 [MSW] Adding comment to case ${caseId}`);
+    
+    const newComment: CaseComment = {
+      id: `comment-${mockComments.length + 1}`,
+      caseId: caseId as string,
+      authorId: '1',
+      authorName: 'Иван Иванов',
+      content: body.content,
+      createdAt: new Date().toISOString(),
+    };
+    
+    mockComments.push(newComment);
+    return HttpResponse.json(newComment, { status: 201 });
+  }),
+
+  // GET /cases/:caseId/attachments - Получить вложения случая
+  http.get(`${API_BASE_URL}/cases/:caseId/attachments`, async ({ params }) => {
+    await delay(300);
+    const { caseId } = params;
+    console.log(`📎 [MSW] Fetching attachments for case: ${caseId}`);
+    
+    const attachments = mockAttachments.filter(a => a.caseId === caseId);
+    return HttpResponse.json(attachments);
+  }),
+
+  // POST /cases/:caseId/attachments - Загрузить вложение
+  http.post(`${API_BASE_URL}/cases/:caseId/attachments`, async ({ request, params }) => {
+    await delay(600);
+    const { caseId } = params;
+    console.log(`📤 [MSW] Uploading attachment to case ${caseId}`);
+    
+    // Симуляция получения файла из FormData
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+    
+    if (!file) {
+      return HttpResponse.json(
+        { message: 'Файл не предоставлен', code: 'NO_FILE' },
+        { status: 400 }
+      );
+    }
+    
+    const newAttachment: CaseAttachment = {
+      id: `attach-${mockAttachments.length + 1}`,
+      caseId: caseId as string,
+      fileName: file.name,
+      fileUrl: `/files/${file.name}`,
+      fileSize: file.size,
+      fileType: file.type,
+      uploadedBy: 'Иван Иванов',
+      uploadedAt: new Date().toISOString(),
+    };
+    
+    mockAttachments.push(newAttachment);
+    return HttpResponse.json(newAttachment, { status: 201 });
+  }),
+
+  ...tasksHandlers,
+  ...incidentsHandlers
 
 ];

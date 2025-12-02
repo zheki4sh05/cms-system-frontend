@@ -1,0 +1,530 @@
+// src/mocks/handlers_incidents.ts
+
+import { http, HttpResponse, delay } from 'msw';
+import type {
+  Incident,
+  IncidentStatus,
+  IncidentSeverity,
+  IncidentCategory,
+  IncidentStatistics,
+  ResolveIncidentRequest,
+  CreateCaseFromIncidentsRequest,
+} from '@shared/types/incidentTypes';
+import type { Case, CaseStatus } from '@shared/types/caseTypes';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+
+// Моковые данные инцидентов
+let mockIncidents: Incident[] = [
+  {
+    id: 'INC-2024-156',
+    title: 'Менеджер проводит закупки у компании, где является совладельцем',
+    description: 'Обнаружено, что менеджер Сидоров А.И. проводит закупки у ООО "Техноком", где он является совладельцем (25% доли) согласно данным ЕГРЮЛ.',
+    status: 'NEW' as IncidentStatus,
+    severity: 'CRITICAL' as IncidentSeverity,
+    category: 'ETHICS' as IncidentCategory,
+    ruleId: 'RULE-001',
+    ruleName: 'Конфликт интересов при закупках',
+    ruleExpression: 'when manager.id in vendor.owners then raise_incident(CRITICAL)',
+    assignedTo: '1',
+    assignedToName: 'Иван Иванов',
+    detectedAt: '2024-12-01T11:00:00Z',
+    createdAt: '2024-12-01T11:00:00Z',
+    updatedAt: '2024-12-01T11:00:00Z',
+    sourceSystem: 'ERP',
+    sourceEventId: 'EVT-2024-5678',
+    vendorId: 'VENDOR-123',
+    vendorName: 'ООО "Техноком"',
+    amount: 1250000,
+    payloadJson: {
+      managerId: 'MGR-456',
+      managerName: 'Сидоров А.И.',
+      vendorId: 'VENDOR-123',
+      vendorName: 'ООО "Техноком"',
+      ownership: '25%',
+      contractAmount: 1250000,
+      contractDate: '2024-11-28',
+    },
+  },
+  {
+    id: 'INC-2024-157',
+    title: 'Превышение лимита закупки без согласования',
+    description: 'Закупка на сумму 850 000 руб. была проведена без согласования с финансовым директором. Лимит для самостоятельного утверждения: 500 000 руб.',
+    status: 'NEW' as IncidentStatus,
+    severity: 'HIGH' as IncidentSeverity,
+    category: 'FINANCIAL' as IncidentCategory,
+    ruleId: 'RULE-002',
+    ruleName: 'Превышение лимита без согласования',
+    ruleExpression: 'when purchase.amount > 500000 and not exists(approval.cfo) then raise_incident(HIGH)',
+    assignedTo: '1',
+    assignedToName: 'Иван Иванов',
+    detectedAt: '2024-12-02T09:15:00Z',
+    createdAt: '2024-12-02T09:15:00Z',
+    updatedAt: '2024-12-02T09:15:00Z',
+    sourceSystem: '1C',
+    sourceEventId: 'EVT-2024-5679',
+    vendorId: 'VENDOR-234',
+    vendorName: 'ООО "Альфа Поставка"',
+    amount: 850000,
+    departmentId: 'DEPT-002',
+    payloadJson: {
+      purchaseId: 'PO-2024-1234',
+      amount: 850000,
+      limit: 500000,
+      approvals: ['Менеджер по закупкам', 'Руководитель отдела'],
+      missingApproval: 'Финансовый директор',
+    },
+  },
+  {
+    id: 'INC-2024-158',
+    title: 'Закупка у поставщика с истекшей лицензией',
+    description: 'ООО "БетаСтрой" проводит поставку строительных материалов, но срок действия их лицензии истек 15.11.2024.',
+    status: 'ASSIGNED' as IncidentStatus,
+    severity: 'MEDIUM' as IncidentSeverity,
+    category: 'COMPLIANCE' as IncidentCategory,
+    ruleId: 'RULE-003',
+    ruleName: 'Истекшая лицензия поставщика',
+    ruleExpression: 'when vendor.license.expiry < current_date then raise_incident(MEDIUM)',
+    assignedTo: '1',
+    assignedToName: 'Иван Иванов',
+    detectedAt: '2024-12-01T14:30:00Z',
+    createdAt: '2024-12-01T14:30:00Z',
+    updatedAt: '2024-12-02T08:00:00Z',
+    sourceSystem: 'ERP',
+    sourceEventId: 'EVT-2024-5680',
+    vendorId: 'VENDOR-345',
+    vendorName: 'ООО "БетаСтрой"',
+    amount: 320000,
+    payloadJson: {
+      vendorId: 'VENDOR-345',
+      vendorName: 'ООО "БетаСтрой"',
+      licenseType: 'Строительная лицензия',
+      expiryDate: '2024-11-15',
+      currentDate: '2024-12-01',
+      contractAmount: 320000,
+    },
+  },
+  {
+    id: 'INC-2024-159',
+    title: 'Систематическое опоздание поставки (7-й случай за 3 месяца)',
+    description: 'Поставщик ООО "Гамма Логистика" в очередной раз нарушил сроки поставки. Это 7-й случай за последние 3 месяца.',
+    status: 'IN_REVIEW' as IncidentStatus,
+    severity: 'MEDIUM' as IncidentSeverity,
+    category: 'LOGISTICS' as IncidentCategory,
+    ruleId: 'RULE-004',
+    ruleName: 'Систематическое нарушение сроков',
+    ruleExpression: 'when count(vendor.delays, 3_months) >= 5 then raise_incident(MEDIUM)',
+    assignedTo: '1',
+    assignedToName: 'Иван Иванов',
+    detectedAt: '2024-12-01T16:00:00Z',
+    createdAt: '2024-12-01T16:00:00Z',
+    updatedAt: '2024-12-02T10:30:00Z',
+    sourceSystem: 'WMS',
+    sourceEventId: 'EVT-2024-5681',
+    vendorId: 'VENDOR-456',
+    vendorName: 'ООО "Гамма Логистика"',
+    payloadJson: {
+      vendorId: 'VENDOR-456',
+      delayCount: 7,
+      period: '3 месяца',
+      avgDelayDays: 4.5,
+      lastDeliveries: [
+        { date: '2024-11-28', plannedDate: '2024-11-25', delayDays: 3 },
+        { date: '2024-11-15', plannedDate: '2024-11-10', delayDays: 5 },
+        { date: '2024-10-30', plannedDate: '2024-10-25', delayDays: 5 },
+      ],
+    },
+  },
+  {
+    id: 'INC-2024-160',
+    title: 'Дублирование записи поставщика в базе данных',
+    description: 'Обнаружено 3 записи для ООО "Альфа" с разными идентификаторами: VENDOR-234, VENDOR-345, VENDOR-456',
+    status: 'ASSIGNED' as IncidentStatus,
+    severity: 'LOW' as IncidentSeverity,
+    category: 'DATA_QUALITY' as IncidentCategory,
+    ruleId: 'RULE-005',
+    ruleName: 'Дубликаты контрагентов',
+    ruleExpression: 'when count(vendor.inn) > 1 then raise_incident(LOW)',
+    assignedTo: '1',
+    assignedToName: 'Иван Иванов',
+    detectedAt: '2024-11-30T10:00:00Z',
+    createdAt: '2024-11-30T10:00:00Z',
+    updatedAt: '2024-12-01T09:00:00Z',
+    sourceSystem: 'CRM',
+    sourceEventId: 'EVT-2024-5682',
+    vendorName: 'ООО "Альфа"',
+    payloadJson: {
+      inn: '7707123456',
+      duplicates: [
+        { id: 'VENDOR-234', name: 'ООО "Альфа"', createdAt: '2024-01-15' },
+        { id: 'VENDOR-345', name: 'ООО Альфа', createdAt: '2024-03-20' },
+        { id: 'VENDOR-456', name: 'ООО "АЛЬФА"', createdAt: '2024-06-10' },
+      ],
+    },
+  },
+  {
+    id: 'INC-2024-161',
+    title: 'Изменение цен поставщиком после согласования бюджета',
+    description: 'Поставщик ООО "Дельта" увеличил цены на 15% после согласования и утверждения бюджета закупки.',
+    status: 'NEW' as IncidentStatus,
+    severity: 'HIGH' as IncidentSeverity,
+    category: 'FINANCIAL' as IncidentCategory,
+    ruleId: 'RULE-006',
+    ruleName: 'Изменение цен после согласования',
+    ruleExpression: 'when vendor.price_change > 10% after budget.approval then raise_incident(HIGH)',
+    assignedTo: '1',
+    assignedToName: 'Иван Иванов',
+    detectedAt: '2024-12-02T11:00:00Z',
+    createdAt: '2024-12-02T11:00:00Z',
+    updatedAt: '2024-12-02T11:00:00Z',
+    sourceSystem: 'ERP',
+    sourceEventId: 'EVT-2024-5683',
+    vendorId: 'VENDOR-567',
+    vendorName: 'ООО "Дельта"',
+    amount: 450000,
+    payloadJson: {
+      vendorId: 'VENDOR-567',
+      originalPrice: 390000,
+      newPrice: 450000,
+      priceChange: 15.4,
+      budgetApprovalDate: '2024-11-20',
+      priceChangeDate: '2024-12-01',
+    },
+  },
+  {
+    id: 'INC-2024-155',
+    title: 'Закупка у поставщика без НДС при обязательном требовании',
+    description: 'Проведена закупка у ООО "Эпсилон", применяющего УСН, в то время как требования тендера предусматривали работу только с плательщиками НДС.',
+    status: 'RESOLVED' as IncidentStatus,
+    severity: 'MEDIUM' as IncidentSeverity,
+    category: 'COMPLIANCE' as IncidentCategory,
+    ruleId: 'RULE-007',
+    ruleName: 'Нарушение требований по НДС',
+    ruleExpression: 'when tender.requires_vat and vendor.vat_status = false then raise_incident(MEDIUM)',
+    assignedTo: '1',
+    assignedToName: 'Иван Иванов',
+    detectedAt: '2024-11-25T08:00:00Z',
+    createdAt: '2024-11-25T08:00:00Z',
+    updatedAt: '2024-11-27T15:00:00Z',
+    resolvedAt: '2024-11-27T15:00:00Z',
+    sourceSystem: 'ERP',
+    sourceEventId: 'EVT-2024-5654',
+    vendorId: 'VENDOR-678',
+    vendorName: 'ООО "Эпсилон"',
+    amount: 180000,
+    resolutionNotes: 'Подтверждено руководством, что требование по НДС было изменено. Документы обновлены в системе.',
+    payloadJson: {
+      tenderId: 'TENDER-2024-089',
+      vendorId: 'VENDOR-678',
+      vatStatus: false,
+      tenderRequirement: 'VAT_REQUIRED',
+    },
+  },
+  {
+    id: 'INC-2024-154',
+    title: 'Превышение допустимого отклонения цены от среднерыночной',
+    description: 'Цена на офисную бумагу превышает среднерыночную на 42%. Допустимое отклонение: 20%.',
+    status: 'FALSE_POSITIVE' as IncidentStatus,
+    severity: 'LOW' as IncidentSeverity,
+    category: 'FINANCIAL' as IncidentCategory,
+    ruleId: 'RULE-008',
+    ruleName: 'Превышение рыночной цены',
+    ruleExpression: 'when (purchase.price - market.avg_price) / market.avg_price > 0.2 then raise_incident(LOW)',
+    assignedTo: '1',
+    assignedToName: 'Иван Иванов',
+    detectedAt: '2024-11-20T09:30:00Z',
+    createdAt: '2024-11-20T09:30:00Z',
+    updatedAt: '2024-11-22T14:00:00Z',
+    resolvedAt: '2024-11-22T14:00:00Z',
+    sourceSystem: '1C',
+    sourceEventId: 'EVT-2024-5644',
+    vendorId: 'VENDOR-789',
+    vendorName: 'ООО "Оптима"',
+    amount: 25000,
+    falsePositiveReason: 'Закупка производилась со срочной доставкой в удаленный филиал, что объясняет повышенную стоимость. Это было предварительно согласовано.',
+    payloadJson: {
+      productName: 'Офисная бумага А4, 80г/м2',
+      purchasePrice: 350,
+      marketAvgPrice: 246,
+      deviation: 42.3,
+      reason: 'Срочная доставка в удаленный регион',
+    },
+  },
+  {
+    id: 'INC-2024-153',
+    title: 'Закупка у поставщика из санкционного списка',
+    description: 'Обнаружена попытка проведения закупки у компании, включенной в санкционный список.',
+    status: 'ESCALATED_TO_CASE' as IncidentStatus,
+    severity: 'CRITICAL' as IncidentSeverity,
+    category: 'COMPLIANCE' as IncidentCategory,
+    ruleId: 'RULE-009',
+    ruleName: 'Санкционный список',
+    ruleExpression: 'when vendor.id in sanctions.list then raise_incident(CRITICAL)',
+    assignedTo: '1',
+    assignedToName: 'Иван Иванов',
+    detectedAt: '2024-11-18T10:00:00Z',
+    createdAt: '2024-11-18T10:00:00Z',
+    updatedAt: '2024-11-20T16:00:00Z',
+    resolvedAt: '2024-11-20T16:00:00Z',
+    caseId: 'CS-2024-003',
+    caseTitle: 'Подозрение на конфликт интересов',
+    sourceSystem: 'ERP',
+    sourceEventId: 'EVT-2024-5634',
+    vendorId: 'VENDOR-890',
+    vendorName: 'ООО "Зета"',
+    amount: 950000,
+    payloadJson: {
+      vendorId: 'VENDOR-890',
+      vendorName: 'ООО "Зета"',
+      sanctionList: 'EU Sanctions List',
+      addedDate: '2024-09-15',
+      reason: 'Political sanctions',
+    },
+  },
+];
+
+// Моковые случаи (для эскалации)
+let mockCases: Case[] = [];
+
+export const incidentsHandlers = [
+  // GET /incidents/my - Получить мои инциденты
+  http.get(`${API_BASE_URL}/incidents/my`, async ({ request }) => {
+    await delay(400);
+    console.log('🚨 [MSW] Fetching my incidents');
+    
+    const url = new URL(request.url);
+    const status = url.searchParams.get('status')?.split(',');
+    const severity = url.searchParams.get('severity')?.split(',');
+    const category = url.searchParams.get('category')?.split(',');
+    const dateFrom = url.searchParams.get('dateFrom');
+    const dateTo = url.searchParams.get('dateTo');
+    const searchQuery = url.searchParams.get('q');
+    
+    let filtered = [...mockIncidents];
+    
+    // Фильтрация по статусу
+    if (status && status.length > 0) {
+      filtered = filtered.filter(i => status.includes(i.status));
+    }
+    
+    // Фильтрация по критичности
+    if (severity && severity.length > 0) {
+      filtered = filtered.filter(i => severity.includes(i.severity));
+    }
+    
+    // Фильтрация по категории
+    if (category && category.length > 0) {
+      filtered = filtered.filter(i => category.includes(i.category));
+    }
+    
+    // Фильтрация по дате
+    if (dateFrom) {
+      filtered = filtered.filter(i => new Date(i.detectedAt) >= new Date(dateFrom));
+    }
+    if (dateTo) {
+      filtered = filtered.filter(i => new Date(i.detectedAt) <= new Date(dateTo));
+    }
+    
+    // Поиск
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(i =>
+        i.title.toLowerCase().includes(query) ||
+        i.description.toLowerCase().includes(query) ||
+        i.id.toLowerCase().includes(query) ||
+        i.ruleName.toLowerCase().includes(query)
+      );
+    }
+    
+    return HttpResponse.json(filtered);
+  }),
+
+  // GET /incidents/statistics - Статистика по инцидентам
+  http.get(`${API_BASE_URL}/incidents/statistics`, async () => {
+    await delay(300);
+    console.log('📊 [MSW] Fetching incident statistics');
+    
+    const statistics: IncidentStatistics = {
+      total: mockIncidents.length,
+      new: mockIncidents.filter(i => i.status === 'NEW').length,
+      assigned: mockIncidents.filter(i => i.status === 'ASSIGNED').length,
+      inReview: mockIncidents.filter(i => i.status === 'IN_REVIEW').length,
+      resolved: mockIncidents.filter(i => i.status === 'RESOLVED').length,
+      falsePositive: mockIncidents.filter(i => i.status === 'FALSE_POSITIVE').length,
+      escalatedToCase: mockIncidents.filter(i => i.status === 'ESCALATED_TO_CASE').length,
+      bySeverity: {
+        low: mockIncidents.filter(i => i.severity === 'LOW').length,
+        medium: mockIncidents.filter(i => i.severity === 'MEDIUM').length,
+        high: mockIncidents.filter(i => i.severity === 'HIGH').length,
+        critical: mockIncidents.filter(i => i.severity === 'CRITICAL').length,
+      },
+      byCategory: {
+        FINANCIAL: mockIncidents.filter(i => i.category === 'FINANCIAL').length,
+        VENDOR: mockIncidents.filter(i => i.category === 'VENDOR').length,
+        COMPLIANCE: mockIncidents.filter(i => i.category === 'COMPLIANCE').length,
+        LOGISTICS: mockIncidents.filter(i => i.category === 'LOGISTICS').length,
+        DATA_QUALITY: mockIncidents.filter(i => i.category === 'DATA_QUALITY').length,
+        ETHICS: mockIncidents.filter(i => i.category === 'ETHICS').length,
+      },
+      avgResolutionTime: 36, // В часах
+    };
+    
+    return HttpResponse.json(statistics);
+  }),
+
+  // GET /incidents/:incidentId - Получить инцидент по ID
+  http.get(`${API_BASE_URL}/incidents/:incidentId`, async ({ params }) => {
+    await delay(300);
+    const { incidentId } = params;
+    console.log(`📄 [MSW] Fetching incident: ${incidentId}`);
+    
+    const incident = mockIncidents.find(i => i.id === incidentId);
+    
+    if (!incident) {
+      return HttpResponse.json(
+        { message: 'Инцидент не найден', code: 'INCIDENT_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+    
+    return HttpResponse.json(incident);
+  }),
+
+  // POST /incidents/:incidentId/resolve - Решить инцидент
+  http.post(`${API_BASE_URL}/incidents/:incidentId/resolve`, async ({ request, params }) => {
+    await delay(400);
+    const { incidentId } = params;
+    const body = await request.json() as ResolveIncidentRequest;
+    console.log(`✅ [MSW] Resolving incident ${incidentId}:`, body);
+    
+    const index = mockIncidents.findIndex(i => i.id === incidentId);
+    
+    if (index === -1) {
+      return HttpResponse.json(
+        { message: 'Инцидент не найден', code: 'INCIDENT_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+    
+    mockIncidents[index] = {
+      ...mockIncidents[index],
+      status: body.status,
+      resolutionNotes: body.resolutionNotes,
+      falsePositiveReason: body.falsePositiveReason,
+      resolvedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    return HttpResponse.json(mockIncidents[index]);
+  }),
+
+  // POST /incidents/create-case - Создать случай из инцидентов
+  http.post(`${API_BASE_URL}/incidents/create-case`, async ({ request }) => {
+    await delay(600);
+    const body = await request.json() as CreateCaseFromIncidentsRequest;
+    console.log('📁 [MSW] Creating case from incidents:', body);
+    
+    // Проверить, что все инциденты существуют
+    const incidents = mockIncidents.filter(i => body.incidentIds.includes(i.id));
+    
+    if (incidents.length !== body.incidentIds.length) {
+      return HttpResponse.json(
+        { message: 'Некоторые инциденты не найдены', code: 'INCIDENTS_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+    
+    // Создать новый случай
+    const newCase: Case = {
+      id: `CS-2024-${String(mockCases.length + 6).padStart(3, '0')}`,
+      title: body.title,
+      description: body.description,
+      status: 'OPEN' as CaseStatus,
+      severity: body.severity as any,
+      priority: body.priority as any,
+      ownerId: '1',
+      ownerName: 'Иван Иванов',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      incidentIds: body.incidentIds,
+      tags: [],
+      requiresCorrectiveAction: false,
+    };
+    
+    mockCases.push(newCase);
+    
+    // Обновить статус инцидентов
+    body.incidentIds.forEach(incidentId => {
+      const index = mockIncidents.findIndex(i => i.id === incidentId);
+      if (index !== -1) {
+        mockIncidents[index] = {
+          ...mockIncidents[index],
+          status: 'ESCALATED_TO_CASE' as IncidentStatus,
+          caseId: newCase.id,
+          caseTitle: newCase.title,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+    });
+    
+    return HttpResponse.json(newCase, { status: 201 });
+  }),
+
+  // POST /incidents/:incidentId/assign-to-me - Взять инцидент в работу
+  http.post(`${API_BASE_URL}/incidents/:incidentId/assign-to-me`, async ({ params }) => {
+    await delay(300);
+    const { incidentId } = params;
+    console.log(`👤 [MSW] Assigning incident ${incidentId} to me`);
+    
+    const index = mockIncidents.findIndex(i => i.id === incidentId);
+    
+    if (index === -1) {
+      return HttpResponse.json(
+        { message: 'Инцидент не найден', code: 'INCIDENT_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+    
+    mockIncidents[index] = {
+      ...mockIncidents[index],
+      status: 'ASSIGNED' as IncidentStatus,
+      assignedTo: '1',
+      assignedToName: 'Иван Иванов',
+      updatedAt: new Date().toISOString(),
+    };
+    
+    return HttpResponse.json(mockIncidents[index]);
+  }),
+
+  // GET /incidents/:incidentId/similar - Получить похожие инциденты
+  http.get(`${API_BASE_URL}/incidents/:incidentId/similar`, async ({ params }) => {
+    await delay(500);
+    const { incidentId } = params;
+    console.log(`🔍 [MSW] Fetching similar incidents for: ${incidentId}`);
+    
+    const incident = mockIncidents.find(i => i.id === incidentId);
+    
+    if (!incident) {
+      return HttpResponse.json(
+        { message: 'Инцидент не найден', code: 'INCIDENT_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+    
+    // Найти похожие инциденты (по категории, правилу или поставщику)
+    const similar = mockIncidents.filter(i =>
+      i.id !== incidentId &&
+      (
+        i.category === incident.category ||
+        i.ruleId === incident.ruleId ||
+        (i.vendorId && i.vendorId === incident.vendorId)
+      ) &&
+      i.status !== 'RESOLVED' &&
+      i.status !== 'FALSE_POSITIVE' &&
+      i.status !== 'ESCALATED_TO_CASE'
+    ).slice(0, 5);
+    
+    return HttpResponse.json(similar);
+  }),
+];

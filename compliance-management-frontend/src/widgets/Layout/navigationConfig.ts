@@ -12,6 +12,7 @@ import {
 } from '@mui/icons-material';
 import { type SvgIconTypeMap } from '@mui/material';
 import { type OverridableComponent } from '@mui/material/OverridableComponent';
+import RuleIcon from '@mui/icons-material/Rule';
 
 export interface NavigationItem {
   id: string;
@@ -58,6 +59,13 @@ export const navigationItems: NavigationItem[] = [
     label: 'Помощь',
     path: '/manager/help',
     icon: HelpOutlineOutlined,
+    roles: [UserRoleValues.MANAGER],
+  },
+    {
+    id: 'manager-rules',
+    label: 'Правила',
+    path: '/manager/rules',
+    icon: RuleIcon,
     roles: [UserRoleValues.MANAGER],
   },
 
