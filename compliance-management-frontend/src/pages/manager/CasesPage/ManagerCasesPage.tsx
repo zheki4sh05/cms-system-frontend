@@ -243,6 +243,7 @@ export const ManagerCasesPage: FC = observer(() => {
       PENDING_VERIFICATION: 'На проверке',
       CLOSED: 'Закрыт',
       REJECTED: 'Отклонен',
+      ESCALATED_TO_CASE: 'Эскалация'
     };
     return labels[status];
   };

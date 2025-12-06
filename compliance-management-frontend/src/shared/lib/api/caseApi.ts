@@ -8,6 +8,8 @@ import type {
   CreateCaseRequest,
   UpdateCaseRequest,
   CaseStatistics,
+  CaseVerificationDetails,
+  VerificationDecision,
 } from '@shared/types/caseTypes';
 
 export class CaseApi {
@@ -98,6 +100,35 @@ export class CaseApi {
         },
       }
     );
+    return response.data;
+  }
+
+  /**
+   * Получить детали для верификации случая (только для руководителя)
+   */
+  static async getCaseVerificationDetails(caseId: string): Promise<CaseVerificationDetails> {
+    const response = await apiClient.get<CaseVerificationDetails>(
+      `/cases/${caseId}/verification-details`
+    );
+    return response.data;
+  }
+
+  /**
+   * Верифицировать случай (утвердить/отклонить)
+   */
+  static async verifyCase(caseId: string, decision: VerificationDecision): Promise<Case> {
+    const response = await apiClient.post<Case>(
+      `/cases/${caseId}/verify`,
+      decision
+    );
+    return response.data;
+  }
+
+  /**
+   * Получить историю верификаций
+   */
+  static async getVerificationHistory(caseId: string): Promise<any[]> {
+    const response = await apiClient.get(`/cases/${caseId}/verification-history`);
     return response.data;
   }
 }

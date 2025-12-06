@@ -7,6 +7,7 @@ export enum CaseStatus {
   PENDING_VERIFICATION = 'PENDING_VERIFICATION',
   CLOSED = 'CLOSED',
   REJECTED = 'REJECTED',
+  ESCALATED_TO_CASE = 'ESCALATED_TO_CASE'
 }
 
 export enum CaseSeverity {
@@ -102,4 +103,43 @@ export interface CaseStatistics {
   pendingVerification: number;
   closed: number;
   avgResolutionTime: number; // В часах
+}
+
+// Обновить src/shared/types/case.types.ts - добавить новые поля
+
+export interface VerificationDecision {
+  approved: boolean;
+  comments: string;
+  rejectionReason?: string;
+  recommendations?: string[];
+  followUpRequired?: boolean;
+}
+
+export interface CaseVerificationDetails {
+  caseId: string;
+  actionPlanId?: string;
+  
+  // Детали для верификации
+  investigationSummary: string;
+  rootCauseAnalysis: string;
+  evidenceProvided: string[];
+  
+  // План корректирующих действий
+  proposedActions: {
+    taskTitle: string;
+    description: string;
+    assignee: string;
+    dueDate: string;
+    status: string;
+  }[];
+  
+  // Метрики
+  estimatedImpact: string;
+  preventiveMeasures: string;
+  resourcesRequired: string;
+  
+  // Статус проверки
+  verificationStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
+  verifiedBy?: string;
+  verifiedAt?: string;
 }

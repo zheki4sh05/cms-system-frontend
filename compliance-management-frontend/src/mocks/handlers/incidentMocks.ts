@@ -1,14 +1,19 @@
 // src/mocks/handlers_incidents.ts
 
 import { http, HttpResponse, delay } from 'msw';
-import type {
-  Incident,
+import {
+  type Incident,
   IncidentStatus,
-  IncidentSeverity,
-  IncidentCategory,
-  IncidentStatistics,
-  ResolveIncidentRequest,
-  CreateCaseFromIncidentsRequest,
+  type IncidentSeverity,
+  type IncidentCategory,
+  type IncidentStatistics,
+  type ResolveIncidentRequest,
+  type CreateCaseFromIncidentsRequest,
+  type ManagerWorkload,
+  type IncidentDistribution,
+  type ReassignIncidentRequest,
+  type EscalateIncidentRequest,
+  type IncidentAssignment,
 } from '@shared/types/incidentTypes';
 import type { Case, CaseStatus } from '@shared/types/caseTypes';
 
@@ -283,10 +288,284 @@ let mockIncidents: Incident[] = [
   },
 ];
 
+// Моковая нагрузка менеджеров
+const mockManagersWorkload: ManagerWorkload[] = [
+  {
+    managerId: '3',
+    managerName: 'Иван Иванов',
+    avatar: undefined,
+    assignedIncidents: 45,
+    activeIncidents: 12,
+    newIncidents: 3,
+    avgResolutionTime: 28,
+    completionRate: 94,
+    overdueIncidents: 0,
+    status: 'BUSY',
+    capacity: 75,
+  },
+  {
+    managerId: '4',
+    managerName: 'Петр Петров',
+    avatar: undefined,
+    assignedIncidents: 38,
+    activeIncidents: 8,
+    newIncidents: 2,
+    avgResolutionTime: 32,
+    completionRate: 89,
+    overdueIncidents: 1,
+    status: 'AVAILABLE',
+    capacity: 60,
+  },
+  {
+    managerId: '5',
+    managerName: 'Мария Сидорова',
+    avatar: undefined,
+    assignedIncidents: 52,
+    activeIncidents: 18,
+    newIncidents: 5,
+    avgResolutionTime: 35,
+    completionRate: 86,
+    overdueIncidents: 3,
+    status: 'OVERLOADED',
+    capacity: 95,
+  },
+  {
+    managerId: '6',
+    managerName: 'Алексей Смирнов',
+    avatar: undefined,
+    assignedIncidents: 31,
+    activeIncidents: 7,
+    newIncidents: 1,
+    avgResolutionTime: 41,
+    completionRate: 78,
+    overdueIncidents: 2,
+    status: 'AVAILABLE',
+    capacity: 55,
+  },
+];
+
+// Моковое распределение инцидентов
+const mockIncidentDistribution: IncidentDistribution[] = [
+  {
+    managerId: '5',
+    managerName: 'Мария Сидорова',
+    count: 52,
+    percentage: 31,
+  },
+  {
+    managerId: '3',
+    managerName: 'Иван Иванов',
+    count: 45,
+    percentage: 27,
+  },
+  {
+    managerId: '4',
+    managerName: 'Петр Петров',
+    count: 38,
+    percentage: 23,
+  },
+  {
+    managerId: '6',
+    managerName: 'Алексей Смирнов',
+    count: 31,
+    percentage: 19,
+  },
+];
+
+// Моковая история переназначений
+const mockAssignmentHistory: Record<string, IncidentAssignment[]> = {
+  'INC-2024-003': [
+    {
+      incidentId: 'INC-2024-003',
+      fromManagerId: '6',
+      toManagerId: '3',
+      reason: 'Менеджер Алексей Смирнов перегружен. Переназначение для ускорения решения.',
+      reassignedBy: 'Петр Петров (Руководитель)',
+      reassignedAt: '2024-11-28T14:30:00Z',
+    },
+  ],
+  'INC-2024-008': [
+    {
+      incidentId: 'INC-2024-008',
+      fromManagerId: '5',
+      toManagerId: '4',
+      reason: 'Конфликт интересов: менеджер работал с данным поставщиком ранее.',
+      reassignedBy: 'Петр Петров (Руководитель)',
+      reassignedAt: '2024-11-25T10:15:00Z',
+    },
+    {
+      incidentId: 'INC-2024-008',
+      fromManagerId: '4',
+      toManagerId: '3',
+      reason: 'Менеджер Петров в отпуске. Переназначение на время отсутствия.',
+      reassignedBy: 'Петр Петров (Руководитель)',
+      reassignedAt: '2024-11-29T09:00:00Z',
+    },
+  ],
+};
+
+
 // Моковые случаи (для эскалации)
-let mockCases: Case[] = [];
+export let mockCases: Case[] = [];
 
 export const incidentsHandlers = [
+
+  // GET /incidents/managers-workload - Получить нагрузку менеджеров
+  http.get(`${API_BASE_URL}/incidents/managers-workload`, async () => {
+    await delay(500);
+    console.log('👥 [MSW] Fetching managers workload');
+    return HttpResponse.json(mockManagersWorkload);
+  }),
+
+  // GET /incidents/distribution - Получить распределение инцидентов
+  http.get(`${API_BASE_URL}/incidents/distribution`, async () => {
+    await delay(400);
+    console.log('📊 [MSW] Fetching incident distribution');
+    return HttpResponse.json(mockIncidentDistribution);
+  }),
+
+  // POST /incidents/:incidentId/reassign - Переназначить инцидент
+  http.post(`${API_BASE_URL}/incidents/:incidentId/reassign`, async ({ request, params }) => {
+    await delay(600);
+    const { incidentId } = params;
+    const body = await request.json() as ReassignIncidentRequest;
+    console.log(`🔄 [MSW] Reassigning incident ${incidentId}:`, body);
+    
+    const index = mockIncidents.findIndex(i => i.id === incidentId);
+    
+    if (index === -1) {
+      return HttpResponse.json(
+        { message: 'Инцидент не найден', code: 'INCIDENT_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+    
+    // Найти нового менеджера
+    const newManager = mockManagersWorkload.find(m => m.managerId === body.toManagerId);
+    
+    if (!newManager) {
+      return HttpResponse.json(
+        { message: 'Менеджер не найден', code: 'MANAGER_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+    
+    // Сохранить старого ответственного
+    const oldManagerId = mockIncidents[index].assignedTo;
+    const oldManagerName = mockIncidents[index].assignedToName;
+    
+    // Обновить инцидент
+    mockIncidents[index] = {
+      ...mockIncidents[index],
+      assignedTo: body.toManagerId,
+      assignedToName: newManager.managerName,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    // Добавить в историю переназначений
+    if (!mockAssignmentHistory[incidentId as string]) {
+      mockAssignmentHistory[incidentId as string] = [];
+    }
+    
+    mockAssignmentHistory[incidentId as string].push({
+      incidentId: incidentId as string,
+      fromManagerId: oldManagerId,
+      toManagerId: body.toManagerId,
+      reason: body.reason,
+      reassignedBy: 'Петр Петров (Руководитель)',
+      reassignedAt: new Date().toISOString(),
+    });
+    
+    // Обновить нагрузку менеджеров
+    const oldManagerIndex = mockManagersWorkload.findIndex(m => m.managerId === oldManagerId);
+    const newManagerIndex = mockManagersWorkload.findIndex(m => m.managerId === body.toManagerId);
+    
+    if (oldManagerIndex !== -1) {
+      mockManagersWorkload[oldManagerIndex].assignedIncidents--;
+      mockManagersWorkload[oldManagerIndex].activeIncidents--;
+      mockManagersWorkload[oldManagerIndex].capacity = Math.max(0, mockManagersWorkload[oldManagerIndex].capacity - 5);
+      
+      // Обновить статус
+      if (mockManagersWorkload[oldManagerIndex].capacity < 70) {
+        mockManagersWorkload[oldManagerIndex].status = 'AVAILABLE';
+      } else if (mockManagersWorkload[oldManagerIndex].capacity < 90) {
+        mockManagersWorkload[oldManagerIndex].status = 'BUSY';
+      }
+    }
+    
+    if (newManagerIndex !== -1) {
+      mockManagersWorkload[newManagerIndex].assignedIncidents++;
+      mockManagersWorkload[newManagerIndex].activeIncidents++;
+      mockManagersWorkload[newManagerIndex].capacity = Math.min(100, mockManagersWorkload[newManagerIndex].capacity + 5);
+      
+      // Обновить статус
+      if (mockManagersWorkload[newManagerIndex].capacity >= 90) {
+        mockManagersWorkload[newManagerIndex].status = 'OVERLOADED';
+      } else if (mockManagersWorkload[newManagerIndex].capacity >= 70) {
+        mockManagersWorkload[newManagerIndex].status = 'BUSY';
+      }
+    }
+    
+    // Обновить распределение
+    const oldDistIndex = mockIncidentDistribution.findIndex(d => d.managerId === oldManagerId);
+    const newDistIndex = mockIncidentDistribution.findIndex(d => d.managerId === body.toManagerId);
+    
+    if (oldDistIndex !== -1) {
+      mockIncidentDistribution[oldDistIndex].count--;
+    }
+    
+    if (newDistIndex !== -1) {
+      mockIncidentDistribution[newDistIndex].count++;
+    }
+    
+    // Пересчитать проценты
+    const total = mockIncidentDistribution.reduce((sum, d) => sum + d.count, 0);
+    mockIncidentDistribution.forEach(d => {
+      d.percentage = Math.round((d.count / total) * 100);
+    });
+    
+    return HttpResponse.json(mockIncidents[index]);
+  }),
+
+  // POST /incidents/:incidentId/escalate - Эскалировать инцидент
+  http.post(`${API_BASE_URL}/incidents/:incidentId/escalate`, async ({ request, params }) => {
+    await delay(700);
+    const { incidentId } = params;
+    const body = await request.json() as EscalateIncidentRequest;
+    console.log(`⬆️ [MSW] Escalating incident ${incidentId}:`, body);
+    
+    const index = mockIncidents.findIndex(i => i.id === incidentId);
+    
+    if (index === -1) {
+      return HttpResponse.json(
+        { message: 'Инцидент не найден', code: 'INCIDENT_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+    
+    // Обновить инцидент - пометить как эскалированный
+    mockIncidents[index] = {
+      ...mockIncidents[index],
+      status:  IncidentStatus.ESCALATED_TO_CASE,
+      updatedAt: new Date().toISOString(),
+    };
+    
+    // В реальном приложении здесь будет создан case или отправлено уведомление топ-менеджменту
+    console.log(`✅ [MSW] Incident ${incidentId} escalated to top management with urgency: ${body.urgency}`);
+    
+    return HttpResponse.json(mockIncidents[index]);
+  }),
+
+  // GET /incidents/:incidentId/assignment-history - Получить историю переназначений
+  http.get(`${API_BASE_URL}/incidents/:incidentId/assignment-history`, async ({ params }) => {
+    await delay(400);
+    const { incidentId } = params;
+    console.log(`📜 [MSW] Fetching assignment history for incident: ${incidentId}`);
+    
+    const history = mockAssignmentHistory[incidentId as string] || [];
+    return HttpResponse.json(history);
+  }),
+
   // GET /incidents/my - Получить мои инциденты
   http.get(`${API_BASE_URL}/incidents/my`, async ({ request }) => {
     await delay(400);

@@ -71,6 +71,7 @@ export const RouterProvider: FC = observer(() => {
             <ProtectedRoute allowedRoles={[UserRoleValues.SUPERVISOR]}>
               <AppLayout>
                 <Routes>
+                   <Route index element={<Navigate to="dashboard" replace />} />
                   <Route path="dashboard" element={<SupervisorDashboardPage />} />
                   <Route path="cases" element={<SupervisorCasesPage />} />
                   <Route path="incidents" element={<SupervisorIncidentsPage />} />

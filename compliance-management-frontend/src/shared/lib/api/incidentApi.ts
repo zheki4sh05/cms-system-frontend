@@ -7,6 +7,11 @@ import type {
   ResolveIncidentRequest,
   CreateCaseFromIncidentsRequest,
   IncidentFilter,
+  ManagerWorkload,
+  IncidentDistribution,
+  ReassignIncidentRequest,
+  EscalateIncidentRequest,
+  IncidentAssignment,
 } from '@shared/types/incidentTypes';
 import type { Case } from '@shared/types/caseTypes';
 
@@ -83,6 +88,60 @@ export class IncidentApi {
    */
   static async getSimilarIncidents(incidentId: string): Promise<Incident[]> {
     const response = await apiClient.get<Incident[]>(`/incidents/${incidentId}/similar`);
+    return response.data;
+  }
+
+  /**
+   * Получить нагрузку всех менеджеров (только для руководителя)
+   */
+  static async getManagersWorkload(): Promise<ManagerWorkload[]> {
+    const response = await apiClient.get<ManagerWorkload[]>('/incidents/managers-workload');
+    return response.data;
+  }
+
+  /**
+   * Получить распределение инцидентов по менеджерам
+   */
+  static async getIncidentDistribution(): Promise<IncidentDistribution[]> {
+    const response = await apiClient.get<IncidentDistribution[]>('/incidents/distribution');
+    return response.data;
+  }
+
+  /**
+   * Переназначить инцидент другому менеджеру
+   */
+  static async reassignIncident(
+    incidentId: string,
+    data: ReassignIncidentRequest
+  ): Promise<Incident> {
+    const response = await apiClient.post<Incident>(
+      `/incidents/${incidentId}/reassign`,
+      data
+    );
+    return response.data;
+  }
+
+  /**
+   * Эскалировать инцидент топ-менеджменту
+   */
+  static async escalateIncident(
+    incidentId: string,
+    data: EscalateIncidentRequest
+  ): Promise<Incident> {
+    const response = await apiClient.post<Incident>(
+      `/incidents/${incidentId}/escalate`,
+      data
+    );
+    return response.data;
+  }
+
+  /**
+   * Получить историю переназначений инцидента
+   */
+  static async getIncidentAssignmentHistory(incidentId: string): Promise<IncidentAssignment[]> {
+    const response = await apiClient.get<IncidentAssignment[]>(
+      `/incidents/${incidentId}/assignment-history`
+    );
     return response.data;
   }
 }

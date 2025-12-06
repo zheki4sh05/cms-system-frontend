@@ -1,5 +1,65 @@
 // src/shared/types/incident.types.ts
 
+// Обновить src/shared/types/incident.types.ts - добавить новые типы
+
+export interface IncidentAssignment {
+  incidentId: string;
+  fromManagerId: string;
+  toManagerId: string;
+  reason: string;
+  reassignedBy: string;
+  reassignedAt: string;
+}
+
+export interface IncidentEscalation {
+  incidentId: string;
+  escalatedBy: string;
+  escalatedTo: string;
+  reason: string;
+  urgency: 'HIGH' | 'CRITICAL';
+  escalatedAt: string;
+}
+
+export interface ManagerWorkload {
+  managerId: string;
+  managerName: string;
+  avatar?: string;
+  
+  // Текущая нагрузка
+  assignedIncidents: number;
+  activeIncidents: number;
+  newIncidents: number;
+  
+  // Показатели
+  avgResolutionTime: number;
+  completionRate: number; // Процент
+  overdueIncidents: number;
+  
+  // Статус
+  status: 'AVAILABLE' | 'BUSY' | 'OVERLOADED';
+  capacity: number; // 0-100%
+}
+
+export interface ReassignIncidentRequest {
+  toManagerId: string;
+  reason: string;
+  notifyManager: boolean;
+}
+
+export interface EscalateIncidentRequest {
+  reason: string;
+  urgency: 'HIGH' | 'CRITICAL';
+  requiresImmediateAction: boolean;
+}
+
+export interface IncidentDistribution {
+  managerId: string;
+  managerName: string;
+  count: number;
+  percentage: number;
+}
+
+
 export enum IncidentStatus {
   NEW = 'NEW',
   ASSIGNED = 'ASSIGNED',
