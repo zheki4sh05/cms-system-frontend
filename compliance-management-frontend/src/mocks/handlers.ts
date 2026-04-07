@@ -1,8 +1,12 @@
 
 import { http, HttpResponse, delay } from 'msw';
 import { mockUsers, generateMockTokens, getUserByToken } from './mockData';
-import { type LoginCredentials, type AuthResponse } from '@shared/types/customTypes';
-import type {User} from '../shared/types/customTypes'
+import {
+  type LoginCredentials,
+  type AuthResponse,
+  type User,
+  UserRoleValues,
+} from '@shared/types/customTypes';
 import { tasksHandlers } from './handlers/taskHandler'; 
 import { incidentsHandlers } from './handlers/incidentMocks';
 import { supervisorHandlers } from './handlers/supervisorHandler';
@@ -14,6 +18,15 @@ import { notificationHandlers } from './handlers/notificationhandlers';
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+
+const getUserFromAuthHeader = (request: Request): User | null => {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    return null;
+  }
+  const token = authHeader.replace('Bearer ', '');
+  return getUserByToken(token);
+};
 
 // Хранилище приглашений
 const mockInvitations: any[] = [];
@@ -49,6 +62,13 @@ const mockDepartments: any[] = [
     updatedAt: '2025-11-05T00:00:00Z',
   },
 ];
+
+// Текущая компания (мутабельное состояние для MSW)
+let mockCompanyProfile = {
+  id: 'company-1',
+  name: 'TrustFlow',
+  employeeCount: 126,
+};
 
 const mockManagerStats = {
   newIncidents: 12,
@@ -647,6 +667,49 @@ http.post(`${API_BASE_URL}/departments/:id/manager`, async ({ request, params })
   };
 
   return HttpResponse.json(mockDepartments[index]);
+}),
+
+// GET /company — профиль компании (все авторизованные роли)
+http.get(`${API_BASE_URL}/company`, async ({ request }) => {
+  await delay(300);
+  const user = getUserFromAuthHeader(request);
+  if (!user) {
+    return HttpResponse.json(
+      { message: 'Unauthorized', code: 'MISSING_OR_INVALID_TOKEN' },
+      { status: 401 }
+    );
+  }
+  return HttpResponse.json(mockCompanyProfile);
+}),
+
+// PATCH /company — обновление наименования (только топ-менеджмент)
+http.patch(`${API_BASE_URL}/company`, async ({ request }) => {
+  await delay(700);
+  const user = getUserFromAuthHeader(request);
+  if (!user) {
+    return HttpResponse.json(
+      { message: 'Unauthorized', code: 'MISSING_OR_INVALID_TOKEN' },
+      { status: 401 }
+    );
+  }
+  if (user.role !== UserRoleValues.EXECUTIVE) {
+    return HttpResponse.json(
+      { message: 'Доступно только топ-менеджменту' },
+      { status: 403 }
+    );
+  }
+
+  const body = (await request.json()) as { name?: string };
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  if (name.length < 2) {
+    return HttpResponse.json(
+      { message: 'Наименование должно содержать минимум 2 символа' },
+      { status: 400 }
+    );
+  }
+
+  mockCompanyProfile = { ...mockCompanyProfile, name };
+  return HttpResponse.json(mockCompanyProfile);
 }),
 
   // GET /dashboard/manager/stats - Статистика для менеджера

@@ -24,13 +24,15 @@ import {
   SettingsOutlined,
   PeopleOutlined,
   DescriptionOutlined,
-  BusinessOutlined
+  BusinessOutlined,
+  ApartmentOutlined,
 } from '@mui/icons-material';
 import { useAuthStore } from '@features/auth/useAuthStore';
 import { getNavigationByRole } from './../Layout/navigationConfig';
 import { EmployeesDrawer } from '@widgets/Layout/EmployeesDrawer';
 import { DocumentsDrawer } from '@widgets/Layout/DocumentsDrawer';
 import { DepartmentsDrawer } from '@widgets/Layout/DepartmentDrawer';
+import { CompanyDrawer } from '@widgets/Layout/CompanyDrawer';
 
 interface SidebarProps {
   open: boolean;
@@ -58,6 +60,7 @@ export const Sidebar: FC<SidebarProps> = observer(({
   const [employeesDrawerOpen, setEmployeesDrawerOpen] = useState(false);
   const [documentsDrawerOpen, setDocumentsDrawerOpen] = useState(false);
   const [departmentsDrawerOpen, setDepartmentsDrawerOpen] = useState(false);
+  const [companyDrawerOpen, setCompanyDrawerOpen] = useState(false);
 
   const handleNavigate = (path: string) => {
     navigate(path);
@@ -272,6 +275,26 @@ export const Sidebar: FC<SidebarProps> = observer(({
                     }}
                   />
                 </ListItemButton>
+
+                {/* Компания */}
+                <ListItemButton
+                  onClick={() => setCompanyDrawerOpen(true)}
+                  sx={{
+                    pl: 4,
+                    borderRadius: 1,
+                    mt: 0.5,
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <ApartmentOutlined />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Компания"
+                    primaryTypographyProps={{
+                      fontSize: '0.875rem',
+                    }}
+                  />
+                </ListItemButton>
               </List>
             </Collapse>
           )}
@@ -294,6 +317,12 @@ export const Sidebar: FC<SidebarProps> = observer(({
       <DocumentsDrawer
         open={documentsDrawerOpen}
         onClose={() => setDocumentsDrawerOpen(false)}
+      />
+
+      {/* Drawer для компании */}
+      <CompanyDrawer
+        open={companyDrawerOpen}
+        onClose={() => setCompanyDrawerOpen(false)}
       />
     </>
   );
