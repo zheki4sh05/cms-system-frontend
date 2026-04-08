@@ -24,6 +24,7 @@ import { useNavigate } from 'react-router-dom';
 export const LoginForm: FC = observer(() => {
   const authStore = useAuthStore();
   const navigate = useNavigate();
+  const isDevProfile = (import.meta.env.VITE_APP_PROFILE ?? 'dev') === 'dev';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -202,21 +203,23 @@ export const LoginForm: FC = observer(() => {
         </Button>
       </Stack>
 
-      {/* Демо-доступы */}
-      <Box sx={{ mt: 4, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
-        <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
-          Демо-доступы для тестирования:
-        </Typography>
-        <Typography variant="caption" component="div" color="text.secondary">
-          • Менеджер: manager@example.com / password123
-        </Typography>
-        <Typography variant="caption" component="div" color="text.secondary">
-          • Руководитель: supervisor@example.com / password123
-        </Typography>
-        <Typography variant="caption" component="div" color="text.secondary">
-          • Топ-менеджмент: executive@example.com / password123
-        </Typography>
-      </Box>
+      {/* Демо-доступы только для dev профиля */}
+      {isDevProfile && (
+        <Box sx={{ mt: 4, p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+          <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
+            Демо-доступы для тестирования:
+          </Typography>
+          <Typography variant="caption" component="div" color="text.secondary">
+            • Менеджер: manager@example.com / password123
+          </Typography>
+          <Typography variant="caption" component="div" color="text.secondary">
+            • Руководитель: supervisor@example.com / password123
+          </Typography>
+          <Typography variant="caption" component="div" color="text.secondary">
+            • Топ-менеджмент: executive@example.com / password123
+          </Typography>
+        </Box>
+      )}
     </Box>
   );
 });
