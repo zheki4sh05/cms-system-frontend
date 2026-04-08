@@ -1,6 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { AuthApi } from '@shared/lib/api/authApi';
-import { type User, type LoginCredentials } from '@shared/types/customTypes';
+import { type User, type LoginCredentials, type RegisterCredentials } from '@shared/types/customTypes';
 import { UserRoleValues } from '@shared/types/customTypes';
 export class AuthStore {
   user: User | null = null;
@@ -82,7 +82,7 @@ export class AuthStore {
   }
 
   // Регистрация нового пользователя
-  async register(credentials: any) {
+  async register(credentials: RegisterCredentials) {
     this.isLoading = true;
     this.error = null;
 

@@ -303,12 +303,28 @@ export const handlers = [
   // POST /auth/register - Регистрация
 http.post(`${API_BASE_URL}/auth/register`, async ({ request }) => {
   await delay(700);
-  const body = await request.json() as {email: string, password: string, firstName: string, lastName: string, role: string, departmentId: string};
+  const body = await request.json() as {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    role: User['role'];
+    companyName?: string;
+  };
   const existing = mockUsers.find(u => u.email === body.email);
   if (existing) {
     return HttpResponse.json(
       { message: 'Пользователь с таким email уже существует', code: 'DUPLICATE_EMAIL' },
       { status: 409 }
+    );
+  }
+  if (
+    body.role === UserRoleValues.EXECUTIVE &&
+    (!body.companyName || body.companyName.trim().length < 2)
+  ) {
+    return HttpResponse.json(
+      { message: 'Для роли ТОП-менеджмент укажите название компании' },
+      { status: 400 }
     );
   }
   const id = (Math.max(...mockUsers.map(u => +u.id || 0), 0) + 1).toString();
@@ -318,11 +334,16 @@ http.post(`${API_BASE_URL}/auth/register`, async ({ request }) => {
     email: body.email,
     firstName: body.firstName,
     lastName: body.lastName,
-    role:'EXECUTIVE',
-    departmentId: body.departmentId,
+    role: body.role,
     isFirstLogin: true,
     password: body.password,
   };
+  if (body.role === UserRoleValues.EXECUTIVE && body.companyName?.trim()) {
+    mockCompanyProfile = {
+      ...mockCompanyProfile,
+      name: body.companyName.trim(),
+    };
+  }
   mockUsers.push(user);
   const tokens = generateMockTokens(id);
   const {...userWithoutPassword } = user;

@@ -30,7 +30,7 @@ export const RegisterForm: FC = observer(() => {
     email: '',
     password: '',
     role: UserRoleValues.MANAGER,
-    departmentId: '',
+    companyName: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [confirm, setConfirm] = useState('');
@@ -56,8 +56,20 @@ export const RegisterForm: FC = observer(() => {
       setError('Пароли не совпадают.');
       return;
     }
+    if (form.role === UserRoleValues.EXECUTIVE && !form.companyName.trim()) {
+      setError('Для роли ТОП-менеджмент укажите название компании.');
+      return;
+    }
     try {
-      await authStore.register(form);
+      await authStore.register({
+        email: form.email,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        password: form.password,
+        role: form.role,
+        companyName:
+          form.role === UserRoleValues.EXECUTIVE ? form.companyName.trim() : undefined,
+      });
       // После регистрации MobX и RouterProvider переведут на страницу помощи
     } catch (e) {
       setError(authStore.error || 'Ошибка регистрации');
@@ -119,11 +131,11 @@ export const RegisterForm: FC = observer(() => {
             <MenuItem value={UserRoleValues.EXECUTIVE}>ТОП-менеджмент</MenuItem>
           </Select>
         </FormControl>
-        {(form.role === UserRoleValues.MANAGER || form.role === UserRoleValues.SUPERVISOR) && (
+        {form.role === UserRoleValues.EXECUTIVE && (
           <TextField
-            label="ID отдела"
-            name="departmentId"
-            value={form.departmentId}
+            label="Название компании"
+            name="companyName"
+            value={form.companyName}
             onChange={handleChange}
             fullWidth
             required

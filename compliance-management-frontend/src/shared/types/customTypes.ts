@@ -31,6 +31,8 @@ export interface RegisterCredentials {
   firstName: string;
   lastName: string;
   password: string;
+  role: UserRole;
+  companyName?: string;
 }
 
 
