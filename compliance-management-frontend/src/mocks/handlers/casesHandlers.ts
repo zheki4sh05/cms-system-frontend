@@ -1,5 +1,5 @@
 import { CasePriority, CaseSeverity, CaseStatus, type Case, type CaseAttachment, type CaseComment, type CaseVerificationDetails, type CreateCaseRequest, type UpdateCaseRequest, type VerificationDecision } from "@shared/types/caseTypes";
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 import { http, HttpResponse, delay } from 'msw';
 // Добавить моковые данные для верификации
 const mockVerificationDetails: Record<string, CaseVerificationDetails> = {

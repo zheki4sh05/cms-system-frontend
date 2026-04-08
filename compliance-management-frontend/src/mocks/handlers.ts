@@ -17,7 +17,7 @@ import { strategicHandlers } from './handlers/strategicHandlers';
 import { notificationHandlers } from './handlers/notificationhandlers';
 
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 
 const getUserFromAuthHeader = (request: Request): User | null => {
   const authHeader = request.headers.get('Authorization');

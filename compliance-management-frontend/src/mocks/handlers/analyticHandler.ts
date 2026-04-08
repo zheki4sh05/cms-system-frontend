@@ -14,7 +14,7 @@ import type {
   ReportExportOptions,
 } from '@shared/types/analyticTypes';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 
 // Вспомогательная функция для генерации дат
 const generateDateRange = (startDate: string, endDate: string): string[] => {
