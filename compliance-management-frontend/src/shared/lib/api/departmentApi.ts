@@ -7,9 +7,11 @@ import type {
 } from '@shared/types/departmentTypes';
 
 export class DepartmentApi {
-  // Получение списка всех департаментов
-  static async getDepartments(): Promise<Department[]> {
-    const response = await apiClient.get<Department[]>('/departments');
+  /** Департаменты компании по id компании */
+  static async getDepartmentsByCompanyId(companyId: string): Promise<Department[]> {
+    const response = await apiClient.get<Department[]>(
+      `/companies/${encodeURIComponent(companyId)}/departments`
+    );
     return response.data;
   }
 

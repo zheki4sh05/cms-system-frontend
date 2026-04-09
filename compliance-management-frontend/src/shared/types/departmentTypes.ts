@@ -13,6 +13,7 @@ export interface CreateDepartmentRequest {
   name: string;
   description?: string;
   managerId?: string;
+  companyId?: string;
 }
 
 export interface UpdateDepartmentRequest {

@@ -13,6 +13,7 @@ export interface User {
   lastName: string;
   role: UserRole;
   employeeId?: string;
+  companyId?: string;
   departmentId?: string;
   isFirstLogin?: boolean;
 }

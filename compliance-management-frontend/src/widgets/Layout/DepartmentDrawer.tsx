@@ -15,6 +15,7 @@ import {
   MenuItem,
   ListItemIcon,
   Alert,
+  CircularProgress,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -30,61 +31,76 @@ import { useAuthStore } from '@features/auth/useAuthStore';
 import { CreateDepartmentDialog } from './CreateDepartmentDialog';
 import { EditDepartmentDialog } from './EditDepartmentDialog';
 import { type Department } from '@shared/types/departmentTypes';
-import { useState, type FC } from 'react';
+import { useState, useEffect, useCallback, type FC } from 'react';
+import { DepartmentApi } from '@shared/lib/api/departmentApi';
+import { CompanyApi } from '@shared/lib/api/companyApi';
 
 interface DepartmentsDrawerProps {
   open: boolean;
   onClose: () => void;
 }
 
-// Моковые данные департаментов
-const mockDepartments: Department[] = [
-  {
-    id: 'dept-001',
-    name: 'Отдел закупок №1',
-    description: 'Основной отдел закупок',
-    managerId: '2',
-    managerName: 'Петр Руководителев',
-    employeeCount: 5,
-    createdAt: '2024-01-15',
-    updatedAt: '2025-11-01',
-  },
-  {
-    id: 'dept-002',
-    name: 'Отдел закупок №2',
-    description: 'Дополнительный отдел закупок',
-    managerId: undefined,
-    managerName: undefined,
-    employeeCount: 3,
-    createdAt: '2024-03-20',
-    updatedAt: '2025-10-15',
-  },
-  {
-    id: 'dept-003',
-    name: 'Департамент стратегических закупок',
-    description: 'Работа с крупными поставщиками',
-    managerId: '2',
-    managerName: 'Петр Руководителев',
-    employeeCount: 8,
-    createdAt: '2024-06-10',
-    updatedAt: '2025-11-05',
-  },
-];
-
 export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, onClose }) => {
   const authStore = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [departments, setDepartments] = useState<Department[]>(mockDepartments);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [menuDepartment, setMenuDepartment] = useState<Department | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Только топ-менеджмент может создавать и редактировать
   const canManageDepartments = authStore.isExecutive;
 
-  const filteredDepartments = departments.filter(dept => 
+  const loadDepartments = useCallback(
+    async (options?: { silent?: boolean }) => {
+      const silent = options?.silent ?? false;
+      setLoadError(null);
+      if (!silent) {
+        setIsLoading(true);
+      }
+      try {
+        let cid = authStore.user?.companyId ?? null;
+        if (!cid) {
+          const company = await CompanyApi.getCompany();
+          cid = company.id;
+        }
+        if (!cid) {
+          setCompanyId(null);
+          setDepartments([]);
+          setLoadError('Не удалось определить компанию');
+          return;
+        }
+
+        setCompanyId(cid);
+        const list = await DepartmentApi.getDepartmentsByCompanyId(cid);
+        setDepartments(list);
+      } catch (error) {
+        console.error('Failed to load departments:', error);
+        setDepartments([]);
+        setLoadError('Не удалось загрузить список департаментов');
+      } finally {
+        if (!silent) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [authStore.user?.companyId]
+  );
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    void loadDepartments();
+  }, [open, loadDepartments]);
+
+  const filteredDepartments = departments.filter(dept =>
     dept.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (dept.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   );
@@ -108,32 +124,23 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
   };
 
   const handleCreate = async (name: string, description?: string) => {
-    // TODO: API call
-    console.log('Creating department:', { name, description });
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const cid = companyId ?? authStore.user?.companyId ?? null;
+    if (!cid) {
+      console.error('Cannot create department: unknown company');
+      return;
+    }
 
-    const newDept: Department = {
-      id: `dept-${Date.now()}`,
+    await DepartmentApi.createDepartment({
       name,
       description,
-      employeeCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    setDepartments([...departments, newDept]);
+      companyId: cid,
+    });
+    await loadDepartments({ silent: true });
   };
 
   const handleUpdate = async (id: string, name: string, description?: string) => {
-    // TODO: API call
-    console.log('Updating department:', { id, name, description });
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    setDepartments(departments.map(dept => 
-      dept.id === id 
-        ? { ...dept, name, description, updatedAt: new Date().toISOString() }
-        : dept
-    ));
+    await DepartmentApi.updateDepartment(id, { name, description });
+    await loadDepartments({ silent: true });
   };
 
   return (
@@ -175,6 +182,12 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
 
         {/* Content */}
         <Box sx={{ p: 3 }}>
+          {loadError && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {loadError}
+            </Alert>
+          )}
+
           {/* Search and Create */}
           <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
             <TextField
@@ -183,6 +196,7 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
               onChange={(e) => setSearchQuery(e.target.value)}
               fullWidth
               size="small"
+              disabled={isLoading}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -197,6 +211,7 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
                 variant="contained"
                 startIcon={<BusinessOutlined />}
                 onClick={() => setCreateDialogOpen(true)}
+                disabled={isLoading || Boolean(loadError)}
                 sx={{ whiteSpace: 'nowrap' }}
               >
                 Создать
@@ -205,10 +220,10 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
           </Stack>
 
           {/* Info для не-топ-менеджмента */}
-          {!canManageDepartments && (
+          {!canManageDepartments && !loadError && (
             <Alert severity="info" sx={{ mb: 3 }}>
               <Typography variant="body2">
-                ℹ️ Режим просмотра. Для создания и редактирования департаментов
+                Режим просмотра. Для создания и редактирования департаментов
                 обратитесь к топ-менеджменту.
               </Typography>
             </Alert>
@@ -219,77 +234,83 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
             Найдено департаментов: {filteredDepartments.length}
           </Typography>
 
-          <List sx={{ bgcolor: 'background.paper' }}>
-            {filteredDepartments.map((dept) => (
-              <Paper
-                key={dept.id}
-                variant="outlined"
-                sx={{ mb: 2, overflow: 'hidden' }}
-              >
-                <Box sx={{ p: 3 }}>
-                  {/* Header */}
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                    <Box sx={{ flex: 1 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                        <BusinessOutlined color="primary" />
-                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                          {dept.name}
-                        </Typography>
-                        <Chip
-                          label={dept.id}
-                          size="small"
-                          variant="outlined"
-                        />
+          {isLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress size={32} />
+            </Box>
+          ) : (
+            <List sx={{ bgcolor: 'background.paper' }}>
+              {filteredDepartments.map((dept) => (
+                <Paper
+                  key={dept.id}
+                  variant="outlined"
+                  sx={{ mb: 2, overflow: 'hidden' }}
+                >
+                  <Box sx={{ p: 3 }}>
+                    {/* Header */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                      <Box sx={{ flex: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                          <BusinessOutlined color="primary" />
+                          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                            {dept.name}
+                          </Typography>
+                          <Chip
+                            label={dept.id}
+                            size="small"
+                            variant="outlined"
+                          />
+                        </Box>
+                        {dept.description && (
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                            {dept.description}
+                          </Typography>
+                        )}
                       </Box>
-                      {dept.description && (
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                          {dept.description}
-                        </Typography>
+
+                      {canManageDepartments && (
+                        <IconButton
+                          size="small"
+                          onClick={(e) => handleMenuOpen(e, dept)}
+                        >
+                          <MoreVertIcon />
+                        </IconButton>
                       )}
                     </Box>
 
-                    {canManageDepartments && (
-                      <IconButton 
-                        size="small"
-                        onClick={(e) => handleMenuOpen(e, dept)}
-                      >
-                        <MoreVertIcon />
-                      </IconButton>
-                    )}
-                  </Box>
-
-                  {/* Stats */}
-                  <Stack direction="row" spacing={3} sx={{ mt: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <PeopleOutlined fontSize="small" color="action" />
-                      <Typography variant="body2" color="text.secondary">
-                        Сотрудников: {dept.employeeCount}
-                      </Typography>
-                    </Box>
-
-                    {dept.managerName && (
+                    {/* Stats */}
+                    <Stack direction="row" spacing={3} sx={{ mt: 2 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <PersonOutlineOutlined fontSize="small" color="action" />
+                        <PeopleOutlined fontSize="small" color="action" />
                         <Typography variant="body2" color="text.secondary">
-                          Руководитель: {dept.managerName}
+                          Сотрудников: {dept.employeeCount}
                         </Typography>
                       </Box>
-                    )}
-                  </Stack>
 
-                  {/* Dates */}
-                  <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-                    <Typography variant="caption" color="text.secondary">
-                      Создан: {new Date(dept.createdAt).toLocaleDateString('ru-RU')} • 
-                      Обновлен: {new Date(dept.updatedAt).toLocaleDateString('ru-RU')}
-                    </Typography>
+                      {dept.managerName && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <PersonOutlineOutlined fontSize="small" color="action" />
+                          <Typography variant="body2" color="text.secondary">
+                            Руководитель: {dept.managerName}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Stack>
+
+                    {/* Dates */}
+                    <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Создан: {new Date(dept.createdAt).toLocaleDateString('ru-RU')} •
+                        Обновлен: {new Date(dept.updatedAt).toLocaleDateString('ru-RU')}
+                      </Typography>
+                    </Box>
                   </Box>
-                </Box>
-              </Paper>
-            ))}
-          </List>
+                </Paper>
+              ))}
+            </List>
+          )}
 
-          {filteredDepartments.length === 0 && (
+          {!isLoading && filteredDepartments.length === 0 && !loadError && (
             <Box sx={{ textAlign: 'center', py: 4 }}>
               <Typography variant="body2" color="text.secondary">
                 Департаменты не найдены

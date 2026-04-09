@@ -10,6 +10,7 @@ export const mockUsers: Array<User & { password: string }> = [
     firstName: 'Иван',
     lastName: 'Менеджеров',
     role: UserRoleValues.MANAGER,
+    companyId: 'company-1',
     departmentId: 'dept-001',
     isFirstLogin: false
   },
@@ -20,6 +21,7 @@ export const mockUsers: Array<User & { password: string }> = [
     firstName: 'Петр',
     lastName: 'Руководителев',
     role: UserRoleValues.SUPERVISOR,
+    companyId: 'company-1',
     departmentId: 'dept-001',
   },
   {
@@ -29,6 +31,7 @@ export const mockUsers: Array<User & { password: string }> = [
     firstName: 'Анна',
     lastName: 'Директорова',
     role: UserRoleValues.EXECUTIVE,
+    companyId: 'company-1',
     departmentId: undefined,
   },
 ];

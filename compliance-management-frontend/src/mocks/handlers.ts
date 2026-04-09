@@ -19,6 +19,9 @@ import { notificationHandlers } from './handlers/notificationhandlers';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 
+/** Как в apiClient: login/register идут на origin без хвоста `/api/v1` */
+const AUTH_API_BASE_URL = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+
 const getUserFromAuthHeader = (request: Request): User | null => {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
@@ -31,10 +34,11 @@ const getUserFromAuthHeader = (request: Request): User | null => {
 // Хранилище приглашений
 const mockInvitations: any[] = [];
 
-// Хранилище департаментов
+// Хранилище департаментов (companyId — для мок-фильтрации по компании, в API-ответ не отдаётся)
 const mockDepartments: any[] = [
   {
     id: 'dept-001',
+    companyId: 'company-1',
     name: 'Отдел закупок №1',
     description: 'Основной отдел закупок',
     managerId: '2',
@@ -45,6 +49,7 @@ const mockDepartments: any[] = [
   },
   {
     id: 'dept-002',
+    companyId: 'company-1',
     name: 'Отдел закупок №2',
     description: 'Дополнительный отдел закупок',
     employeeCount: 3,
@@ -53,6 +58,7 @@ const mockDepartments: any[] = [
   },
   {
     id: 'dept-003',
+    companyId: 'company-1',
     name: 'Департамент стратегических закупок',
     description: 'Работа с крупными поставщиками',
     managerId: '2',
@@ -62,6 +68,11 @@ const mockDepartments: any[] = [
     updatedAt: '2025-11-05T00:00:00Z',
   },
 ];
+
+const toClientDepartment = (row: any) => {
+  const { companyId: _c, ...rest } = row;
+  return rest;
+};
 
 // Текущая компания (мутабельное состояние для MSW)
 let mockCompanyProfile = {
@@ -183,8 +194,8 @@ const mockUpcomingTasks = [
 export const handlers = [
   // ==================== AUTH HANDLERS ====================
 
-  // POST /auth/login - Вход в систему
-  http.post(`${API_BASE_URL}/auth/login`, async ({ request }) => {
+  // POST /auth/login - Вход в систему (URL как у реального клиента)
+  http.post(`${AUTH_API_BASE_URL}/auth/login`, async ({ request }) => {
     // Симуляция задержки сети
     await delay(500);
 
@@ -301,7 +312,7 @@ export const handlers = [
   }),
 
   // POST /auth/register - Регистрация
-http.post(`${API_BASE_URL}/auth/register`, async ({ request }) => {
+http.post(`${AUTH_API_BASE_URL}/auth/register`, async ({ request }) => {
   await delay(700);
   const body = await request.json() as {
     email: string;
@@ -335,6 +346,7 @@ http.post(`${API_BASE_URL}/auth/register`, async ({ request }) => {
     firstName: body.firstName,
     lastName: body.lastName,
     role: body.role,
+    companyId: mockCompanyProfile.id,
     isFirstLogin: true,
     password: body.password,
   };
@@ -346,7 +358,7 @@ http.post(`${API_BASE_URL}/auth/register`, async ({ request }) => {
   }
   mockUsers.push(user);
   const tokens = generateMockTokens(id);
-  const {...userWithoutPassword } = user;
+  const { password: _p, ...userWithoutPassword } = user;
   const response = {
     user: userWithoutPassword,
     tokens,
@@ -499,10 +511,15 @@ http.delete(`${API_BASE_URL}/invitations/:id`, async ({ params }) => {
   });
 }),
 
-// GET /departments - Получение всех департаментов
-http.get(`${API_BASE_URL}/departments`, async () => {
+// GET /companies/:companyId/departments — департаменты компании
+http.get(`${API_BASE_URL}/companies/:companyId/departments`, async ({ params }) => {
   await delay(300);
-  return HttpResponse.json(mockDepartments);
+  const { companyId } = params;
+  const list = mockDepartments
+    .filter((d) => d.companyId === companyId)
+    .map(toClientDepartment);
+
+  return HttpResponse.json(list);
 }),
 
 // GET /departments/:id - Получение департамента по ID
@@ -518,7 +535,7 @@ http.get(`${API_BASE_URL}/departments/:id`, async ({ params }) => {
     );
   }
 
-  return HttpResponse.json(department);
+  return HttpResponse.json(toClientDepartment(department));
 }),
 
 // POST /departments - Создание департамента
@@ -535,9 +552,13 @@ http.post(`${API_BASE_URL}/departments`, async ({ request }) => {
     );
   }
 
+  const targetCompanyId = body.companyId || mockCompanyProfile.id;
+
   // Проверка на дубликат
   const existing = mockDepartments.find(
-    d => d.name.toLowerCase() === body.name.toLowerCase()
+    d =>
+      d.companyId === targetCompanyId &&
+      d.name.toLowerCase() === body.name.toLowerCase()
   );
   if (existing) {
     return HttpResponse.json(
@@ -549,6 +570,7 @@ http.post(`${API_BASE_URL}/departments`, async ({ request }) => {
   // Создание
   const department = {
     id: `dept-${Date.now()}`,
+    companyId: targetCompanyId,
     name: body.name,
     description: body.description,
     managerId: body.managerId,
@@ -559,7 +581,7 @@ http.post(`${API_BASE_URL}/departments`, async ({ request }) => {
 
   mockDepartments.push(department);
 
-  return HttpResponse.json(department, { status: 201 });
+  return HttpResponse.json(toClientDepartment(department), { status: 201 });
 }),
 
 // PATCH /departments/:id - Обновление департамента
@@ -586,14 +608,16 @@ http.patch(`${API_BASE_URL}/departments/:id`, async ({ request, params }) => {
     );
   }
 
+  const { companyId: _ignoreCompany, ...updates } = body;
+
   // Обновление
   mockDepartments[index] = {
     ...mockDepartments[index],
-    ...body,
+    ...updates,
     updatedAt: new Date().toISOString(),
   };
 
-  return HttpResponse.json(mockDepartments[index]);
+  return HttpResponse.json(toClientDepartment(mockDepartments[index]));
 }),
 
 // DELETE /departments/:id - Удаление департамента
@@ -687,7 +711,7 @@ http.post(`${API_BASE_URL}/departments/:id/manager`, async ({ request, params })
     updatedAt: new Date().toISOString(),
   };
 
-  return HttpResponse.json(mockDepartments[index]);
+  return HttpResponse.json(toClientDepartment(mockDepartments[index]));
 }),
 
 // GET /company — профиль компании (все авторизованные роли)
