@@ -2,10 +2,15 @@ import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios';
 
 class ApiClient {
   private instance: AxiosInstance;
+  private readonly baseURL: string;
+  private readonly authBaseURL: string;
 
   constructor() {
+    this.baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+    this.authBaseURL = this.baseURL.replace(/\/api\/v1\/?$/, '');
+
     this.instance = axios.create({
-      baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1',
+      baseURL: this.baseURL,
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json',
@@ -15,6 +20,16 @@ class ApiClient {
     // Request interceptor для добавления токена
     this.instance.interceptors.request.use(
       (config) => {
+        const normalizedUrl = config.url?.trim();
+        const isAuthWithoutV1 = normalizedUrl === '/auth/login'
+          || normalizedUrl === 'auth/login'
+          || normalizedUrl === '/auth/register'
+          || normalizedUrl === 'auth/register';
+
+        if (isAuthWithoutV1) {
+          config.baseURL = this.authBaseURL;
+        }
+
         const token = localStorage.getItem('accessToken');
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
