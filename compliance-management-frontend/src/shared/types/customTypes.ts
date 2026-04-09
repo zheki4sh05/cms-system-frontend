@@ -12,6 +12,7 @@ export interface User {
   firstName: string;
   lastName: string;
   role: UserRole;
+  employeeId?: string;
   departmentId?: string;
   isFirstLogin?: boolean;
 }
@@ -39,4 +40,5 @@ export interface RegisterCredentials {
 export interface AuthResponse {
   user: User;
   tokens: AuthTokens;
+  employeeId?: string;
 }
