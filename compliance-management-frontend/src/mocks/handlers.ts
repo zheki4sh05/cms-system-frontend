@@ -373,9 +373,17 @@ http.post(`${API_BASE_URL}/invitations/send`, async ({ request }) => {
   const body: any = await request.json();
 
   // Валидация
-  if (!body.email || !body.role) {
+  if (!body.email || !body.role || !body.invitedBy) {
     return HttpResponse.json(
-      { message: 'Email и роль обязательны' },
+      { message: 'Email, роль и invitedBy обязательны' },
+      { status: 400 }
+    );
+  }
+
+  const inviter = mockUsers.find((u) => u.id === body.invitedBy);
+  if (!inviter) {
+    return HttpResponse.json(
+      { message: 'Пользователь-инициатор приглашения не найден' },
       { status: 400 }
     );
   }
@@ -407,18 +415,54 @@ http.post(`${API_BASE_URL}/invitations/send`, async ({ request }) => {
     role: body.role,
     departmentId: body.departmentId,
     invitedBy: body.invitedBy,
-    invitedByName: 'Текущий пользователь',
+    invitedByName: `${inviter.firstName} ${inviter.lastName}`,
     status: 'PENDING',
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 дней
   };
 
   mockInvitations.push(invitation);
+  const nextUserId = (Math.max(...mockUsers.map((u) => +u.id || 0), 0) + 1).toString();
+  const emailNamePart = String(body.email).split('@')[0] || 'employee';
+  const normalized = emailNamePart.replace(/[^a-zA-Zа-яА-Я0-9]/g, ' ').trim();
+  const [firstName = 'Новый', lastName = 'Сотрудник'] = normalized.split(/\s+/, 2);
+
+  mockUsers.push({
+    id: nextUserId,
+    email: body.email,
+    password: 'invited-user-temp-password',
+    firstName,
+    lastName,
+    role: body.role,
+    companyId: inviter.companyId,
+    departmentId: body.departmentId,
+    isFirstLogin: true,
+  });
+
+  if (body.departmentId) {
+    const department = mockDepartments.find((d) => d.id === body.departmentId);
+    if (department) {
+      department.employeeCount += 1;
+    }
+  }
 
   return HttpResponse.json({
     invitation,
     message: 'Приглашение успешно отправлено',
   }, { status: 201 });
+}),
+
+// GET /companies/:companyId/employees — сотрудники компании
+http.get(`${API_BASE_URL}/companies/:companyId/employees`, async ({ params }) => {
+  await delay(300);
+  const { companyId } = params;
+  const list = mockUsers
+    .filter((u) => u.companyId === companyId)
+    .map((u) => {
+      const { password: _p, ...user } = u;
+      return user;
+    });
+  return HttpResponse.json(list);
 }),
 
 // GET /invitations/sent - Получение отправленных приглашений

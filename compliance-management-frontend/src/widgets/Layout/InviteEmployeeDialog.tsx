@@ -1,4 +1,4 @@
-import { type FC, useState } from 'react';
+import { type FC, useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import {
   Dialog,
@@ -21,6 +21,9 @@ import { PersonAddOutlined } from '@mui/icons-material';
 import type { UserRole } from '@shared/types/customTypes';
 import { UserRoleValues } from '@shared/types/customTypes';
 import { useAuthStore } from '@features/auth/useAuthStore';
+import { CompanyApi } from '@shared/lib/api/companyApi';
+import { DepartmentApi } from '@shared/lib/api/departmentApi';
+import type { Department } from '@shared/types/departmentTypes';
 
 interface InviteEmployeeDialogProps {
   open: boolean;
@@ -38,6 +41,8 @@ export const InviteEmployeeDialog: FC<InviteEmployeeDialogProps> = observer(({
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<UserRole>(UserRoleValues.MANAGER);
   const [departmentId, setDepartmentId] = useState('');
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -79,6 +84,38 @@ export const InviteEmployeeDialog: FC<InviteEmployeeDialogProps> = observer(({
   // Проверка необходимости указания департамента
   const needsDepartment = role === UserRoleValues.MANAGER || role === UserRoleValues.SUPERVISOR;
 
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const loadDepartments = async () => {
+      setDepartmentsLoading(true);
+      try {
+        let companyId = authStore.user?.companyId;
+        if (!companyId) {
+          const company = await CompanyApi.getCompany();
+          companyId = company.id;
+        }
+
+        if (!companyId) {
+          setDepartments([]);
+          return;
+        }
+
+        const list = await DepartmentApi.getDepartmentsByCompanyId(companyId);
+        setDepartments(list);
+      } catch (loadError) {
+        console.error('Failed to load departments for invite form:', loadError);
+        setDepartments([]);
+      } finally {
+        setDepartmentsLoading(false);
+      }
+    };
+
+    void loadDepartments();
+  }, [open, authStore.user?.companyId]);
+
   const handleSubmit = async () => {
     setError('');
     setSuccess('');
@@ -95,7 +132,7 @@ export const InviteEmployeeDialog: FC<InviteEmployeeDialogProps> = observer(({
     }
 
     if (needsDepartment && !departmentId) {
-      setError('Укажите ID департамента');
+      setError('Выберите департамент');
       return;
     }
 
@@ -114,7 +151,19 @@ export const InviteEmployeeDialog: FC<InviteEmployeeDialogProps> = observer(({
         onClose();
       }, 2000);
     } catch (err: any) {
-      setError(err.message || 'Ошибка при отправке приглашения');
+      const serverStatus = err?.response?.status;
+      const serverError = err?.response?.data?.error;
+      const serverMessage = err?.response?.data?.message;
+
+      if (
+        serverStatus === 400 &&
+        (serverError === 'User with this email does not exist' ||
+          serverMessage === 'User with this email does not exist')
+      ) {
+        setError('Не удалось найти сотрудника с таким email');
+      } else {
+        setError(serverMessage || err.message || 'Ошибка при отправке приглашения');
+      }
     } finally {
       setLoading(false);
     }
@@ -191,23 +240,27 @@ export const InviteEmployeeDialog: FC<InviteEmployeeDialogProps> = observer(({
 
           {/* Департамент (условно) */}
           {needsDepartment && (
-            <TextField
-              label="ID департамента"
-              value={departmentId}
-              onChange={(e) => setDepartmentId(e.target.value)}
-              placeholder="dept-001"
-              fullWidth
-              required
-              disabled={loading}
-              helperText="Укажите идентификатор департамента сотрудника"
-            />
+            <FormControl fullWidth required disabled={loading || departmentsLoading}>
+              <InputLabel>Департамент</InputLabel>
+              <Select
+                value={departmentId}
+                label="Департамент"
+                onChange={(e) => setDepartmentId(e.target.value)}
+              >
+                {departments.map((department) => (
+                  <MenuItem key={department.id} value={department.id}>
+                    {department.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           )}
 
           {/* Информация */}
           <Alert severity="info" sx={{ mt: 1 }}>
             <Typography variant="body2">
-              После отправки приглашения сотрудник получит email с ссылкой для
-              регистрации в системе. Приглашение действительно 7 дней.
+              После отправки приглашения пользователь автоматически становится
+              сотрудником вашей компании.
             </Typography>
           </Alert>
         </Stack>

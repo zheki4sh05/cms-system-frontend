@@ -1,4 +1,4 @@
-import { type FC, useState } from 'react';
+import { type FC, useCallback, useEffect, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import {
   Drawer,
@@ -27,53 +27,37 @@ import {
 } from '@mui/icons-material';
 import { useAuthStore } from '@features/auth/useAuthStore';
 import { InviteEmployeeDialog } from './InviteEmployeeDialog';
-import { type UserRole } from '@shared/types/customTypes';
+import { type User, type UserRole, UserRoleValues } from '@shared/types/customTypes';
+import { InvitationApi } from '@shared/lib/api/invitationApi';
+import { CompanyApi } from '@shared/lib/api/companyApi';
+import { DepartmentApi } from '@shared/lib/api/departmentApi';
+import { EmployeeApi } from '@shared/lib/api/employeeApi';
 
 interface EmployeesDrawerProps {
   open: boolean;
   onClose: () => void;
 }
 
-// Моковые данные сотрудников
-const mockEmployees = [
-  {
-    id: '1',
-    firstName: 'Иван',
-    lastName: 'Менеджеров',
-    email: 'manager@example.com',
-    role: 'MANAGER',
-    roleLabel: 'Менеджер по закупкам',
-    department: 'dept-001',
-    phone: '+7 (495) 123-45-67',
-  },
-  {
-    id: '2',
-    firstName: 'Петр',
-    lastName: 'Руководителев',
-    email: 'supervisor@example.com',
-    role: 'SUPERVISOR',
-    roleLabel: 'Руководитель закупок',
-    department: 'dept-001',
-    phone: '+7 (495) 123-45-68',
-  },
-  {
-    id: '3',
-    firstName: 'Анна',
-    lastName: 'Директорова',
-    email: 'executive@example.com',
-    role: 'EXECUTIVE',
-    roleLabel: 'ТОП-менеджмент',
-    department: undefined,
-    phone: '+7 (495) 123-45-69',
-  },
-];
+interface EmployeeListItem {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: UserRole;
+  roleLabel: string;
+  department?: string;
+  phone?: string;
+}
 
 export const EmployeesDrawer: FC<EmployeesDrawerProps> = observer(({ open, onClose }) => {
   const authStore = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [employees, setEmployees] = useState<EmployeeListItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const filteredEmployees = mockEmployees.filter(emp => 
+  const filteredEmployees = employees.filter(emp =>
     emp.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     emp.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     emp.email.toLowerCase().includes(searchQuery.toLowerCase())
@@ -82,13 +66,26 @@ export const EmployeesDrawer: FC<EmployeesDrawerProps> = observer(({ open, onClo
   // Проверка прав на добавление сотрудников
   const canInviteEmployees = authStore.isExecutive || authStore.isSupervisor;
 
-  const getRoleColor = (role: string) => {
+  const getRoleLabel = (role: UserRole): string => {
     switch (role) {
-      case 'MANAGER':
+      case UserRoleValues.MANAGER:
+        return 'Менеджер по закупкам';
+      case UserRoleValues.SUPERVISOR:
+        return 'Руководитель закупок';
+      case UserRoleValues.EXECUTIVE:
+        return 'ТОП-менеджмент';
+      default:
+        return role;
+    }
+  };
+
+  const getRoleColor = (role: UserRole) => {
+    switch (role) {
+      case UserRoleValues.MANAGER:
         return 'primary';
-      case 'SUPERVISOR':
+      case UserRoleValues.SUPERVISOR:
         return 'secondary';
-      case 'EXECUTIVE':
+      case UserRoleValues.EXECUTIVE:
         return 'error';
       default:
         return 'default';
@@ -99,16 +96,67 @@ export const EmployeesDrawer: FC<EmployeesDrawerProps> = observer(({ open, onClo
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
 
+  const loadEmployees = useCallback(async () => {
+    setLoadError(null);
+    setIsLoading(true);
+    try {
+      let companyId = authStore.user?.companyId;
+      if (!companyId) {
+        const company = await CompanyApi.getCompany();
+        companyId = company.id;
+      }
+      if (!companyId) {
+        setEmployees([]);
+        setLoadError('Не удалось определить компанию');
+        return;
+      }
+
+      const [users, departments] = await Promise.all([
+        EmployeeApi.getEmployeesByCompanyId(companyId),
+        DepartmentApi.getDepartmentsByCompanyId(companyId),
+      ]);
+
+      const departmentMap = new Map(departments.map((d) => [d.id, d.name]));
+      const mapped: EmployeeListItem[] = users.map((u: User) => ({
+        id: u.id,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+        role: u.role,
+        roleLabel: getRoleLabel(u.role),
+        department: u.departmentId ? departmentMap.get(u.departmentId) ?? u.departmentId : undefined,
+      }));
+
+      setEmployees(mapped);
+    } catch (error) {
+      console.error('Failed to load employees:', error);
+      setEmployees([]);
+      setLoadError('Не удалось загрузить список сотрудников');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [authStore.user?.companyId]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    void loadEmployees();
+  }, [open, loadEmployees]);
+
   // Обработка отправки приглашения
   const handleInvite = async (email: string, role: UserRole, departmentId?: string) => {
-    // TODO: Вызов API для отправки приглашения
-    console.log('Sending invitation:', { email, role, departmentId });
+    if (!authStore.user?.id) {
+      throw new Error('Не удалось определить текущего пользователя');
+    }
 
-    // Имитация API вызова
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // TODO: Добавить в список приглашений
-    // TODO: Обновить UI
+    await InvitationApi.sendInvitation({
+      email,
+      role,
+      departmentId,
+      invitedBy: authStore.user.id,
+    });
+    await loadEmployees();
   };
 
   return (
@@ -150,6 +198,22 @@ export const EmployeesDrawer: FC<EmployeesDrawerProps> = observer(({ open, onClo
 
         {/* Content */}
         <Box sx={{ p: 3 }}>
+          {loadError && (
+            <Paper
+              sx={{
+                p: 2,
+                mb: 3,
+                bgcolor: 'error.lighter',
+                border: '1px solid',
+                borderColor: 'error.light',
+              }}
+            >
+              <Typography variant="body2" color="error.main">
+                {loadError}
+              </Typography>
+            </Paper>
+          )}
+
           {/* Search and Add */}
           <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
             <TextField
@@ -203,6 +267,13 @@ export const EmployeesDrawer: FC<EmployeesDrawerProps> = observer(({ open, onClo
             Найдено сотрудников: {filteredEmployees.length}
           </Typography>
 
+          {isLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <Typography variant="body2" color="text.secondary">
+                Загрузка...
+              </Typography>
+            </Box>
+          ) : (
           <List sx={{ bgcolor: 'background.paper' }}>
             {filteredEmployees.map((employee) => (
               <Paper
@@ -254,7 +325,7 @@ export const EmployeesDrawer: FC<EmployeesDrawerProps> = observer(({ open, onClo
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <PhoneOutlined fontSize="small" color="action" />
                           <Typography variant="body2" color="text.secondary">
-                            {employee.phone}
+                            {employee.phone ?? '—'}
                           </Typography>
                         </Box>
                         {employee.department && (
@@ -272,6 +343,7 @@ export const EmployeesDrawer: FC<EmployeesDrawerProps> = observer(({ open, onClo
               </Paper>
             ))}
           </List>
+          )}
 
           {filteredEmployees.length === 0 && (
             <Box sx={{ textAlign: 'center', py: 4 }}>
