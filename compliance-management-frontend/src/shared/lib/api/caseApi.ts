@@ -7,6 +7,7 @@ import type {
   CaseAttachment,
   CreateCaseRequest,
   UpdateCaseRequest,
+  UpdateInvestigationRequest,
   CaseStatistics,
   CaseVerificationDetails,
   VerificationDecision,
@@ -50,6 +51,17 @@ export class CaseApi {
    */
   static async updateCase(caseId: string, data: UpdateCaseRequest): Promise<Case> {
     const response = await apiClient.patch<Case>(`/cases/${caseId}`, data);
+    return response.data;
+  }
+
+  /**
+   * Обновить расследование случая
+   */
+  static async updateInvestigation(
+    caseId: string,
+    data: UpdateInvestigationRequest
+  ): Promise<Case> {
+    const response = await apiClient.patch<Case>(`/cases/${caseId}/investigation`, data);
     return response.data;
   }
 

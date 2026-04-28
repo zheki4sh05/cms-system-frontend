@@ -25,8 +25,12 @@ class ApiClient {
           || normalizedUrl === 'auth/login'
           || normalizedUrl === '/auth/register'
           || normalizedUrl === 'auth/register';
+        const isApiWithoutV1 = normalizedUrl?.startsWith('/api/');
 
         if (isAuthWithoutV1) {
+          config.baseURL = this.authBaseURL;
+        }
+        if (isApiWithoutV1) {
           config.baseURL = this.authBaseURL;
         }
 

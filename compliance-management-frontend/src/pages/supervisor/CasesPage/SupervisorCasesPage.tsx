@@ -245,6 +245,7 @@ export const SupervisorCasesPage: FC = observer(() => {
       case 'OPEN': return 'info';
       case 'IN_PROGRESS': return 'warning';
       case 'INVESTIGATION': return 'primary';
+      case 'ACTION_PLAN': return 'warning';
       case 'PENDING_VERIFICATION': return 'secondary';
       case 'CLOSED': return 'success';
       case 'REJECTED': return 'error';
@@ -256,6 +257,7 @@ export const SupervisorCasesPage: FC = observer(() => {
       OPEN: 'Открыт',
       IN_PROGRESS: 'В работе',
       INVESTIGATION: 'Расследование',
+      ACTION_PLAN: 'План действий',
       PENDING_VERIFICATION: 'На проверке',
       CLOSED: 'Закрыт',
       REJECTED: 'Отклонен',
@@ -287,7 +289,10 @@ export const SupervisorCasesPage: FC = observer(() => {
 
   const pendingVerificationCases = filteredCases.filter(c => c.status === 'PENDING_VERIFICATION');
   const activeCases = filteredCases.filter(c => 
-    c.status === 'OPEN' || c.status === 'IN_PROGRESS' || c.status === 'INVESTIGATION'
+    c.status === 'OPEN' ||
+    c.status === 'IN_PROGRESS' ||
+    c.status === 'INVESTIGATION' ||
+    c.status === 'ACTION_PLAN'
   );
   const completedCases = filteredCases.filter(c => c.status === 'CLOSED' || c.status === 'REJECTED');
 
@@ -412,6 +417,7 @@ export const SupervisorCasesPage: FC = observer(() => {
                   <MenuItem value="PENDING_VERIFICATION">На проверке</MenuItem>
                   <MenuItem value="IN_PROGRESS">В работе</MenuItem>
                   <MenuItem value="INVESTIGATION">Расследование</MenuItem>
+                  <MenuItem value="ACTION_PLAN">План действий</MenuItem>
                   <MenuItem value="CLOSED">Закрыто</MenuItem>
                 </Select>
               </FormControl>

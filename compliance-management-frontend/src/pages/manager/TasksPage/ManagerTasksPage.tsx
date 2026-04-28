@@ -71,7 +71,7 @@ import type {
   CreateTaskRequest,
   TaskStatistics,
 } from '@shared/types/taskTypes';
-import type { Case } from '@shared/types/caseTypes';
+import type { Case, CaseStatus } from '@shared/types/caseTypes';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -194,6 +194,10 @@ export const ManagerTasksPage: FC = observer(() => {
         description: planDescription,
         tasks: planTasks,
       });
+
+      await CaseApi.updateCase(selectedCaseForPlan, {
+        status: 'ACTION_PLAN' as CaseStatus,
+      });
       
       await loadData();
       setCreatePlanDialogOpen(false);
@@ -212,6 +216,9 @@ export const ManagerTasksPage: FC = observer(() => {
     
     try {
       await TaskApi.submitForVerification(selectedPlan.id);
+      await CaseApi.updateCase(selectedPlan.caseId, {
+        status: 'PENDING_VERIFICATION' as CaseStatus,
+      });
       await loadData();
       setViewPlanDialogOpen(false);
       setSelectedPlan(null);

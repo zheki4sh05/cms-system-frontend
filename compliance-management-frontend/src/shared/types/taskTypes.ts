@@ -92,6 +92,18 @@ export interface CreateActionPlanRequest {
   tasks: CreateTaskRequest[];
 }
 
+export interface CreateActionPlanApiRequest {
+  caseId: string;
+  title: string;
+  description: string;
+  tasks: Array<{
+    title: string;
+    description: string;
+    priority: TaskPriority;
+    dueDate: string;
+  }>;
+}
+
 export interface CreateTaskRequest {
   title: string;
   description: string;

@@ -4,6 +4,7 @@ export enum CaseStatus {
   OPEN = 'OPEN',
   IN_PROGRESS = 'IN_PROGRESS',
   INVESTIGATION = 'INVESTIGATION',
+  ACTION_PLAN = 'ACTION_PLAN',
   PENDING_VERIFICATION = 'PENDING_VERIFICATION',
   CLOSED = 'CLOSED',
   REJECTED = 'REJECTED',
@@ -93,6 +94,12 @@ export interface UpdateCaseRequest {
   rootCause?: string;
   requiresCorrectiveAction?: boolean;
   tags?: string[];
+}
+
+export interface UpdateInvestigationRequest {
+  investigationNotes: string;
+  rootCause: string;
+  requiresCorrectiveAction: boolean;
 }
 
 export interface CaseStatistics {

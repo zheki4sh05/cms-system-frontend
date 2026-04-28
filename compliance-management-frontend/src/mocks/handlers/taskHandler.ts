@@ -335,8 +335,8 @@ http.patch(`${API_BASE_URL}/tasks/:taskId`, async ({ request, params }) => {
     return HttpResponse.json(plan);
   }),
 
-  // POST /action-plans - Создать план действий
-  http.post(`${API_BASE_URL}/action-plans`, async ({ request }) => {
+  // POST /api/action-plans - Создать план действий
+  http.post(`${API_BASE_URL.replace('/api/v1', '')}/api/action-plans`, async ({ request }) => {
     await delay(600);
     const body = await request.json() as CreateActionPlanRequest;
     console.log('➕ [MSW] Creating action plan:', body);

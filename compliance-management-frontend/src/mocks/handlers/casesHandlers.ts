@@ -1,4 +1,4 @@
-import { CasePriority, CaseSeverity, CaseStatus, type Case, type CaseAttachment, type CaseComment, type CaseVerificationDetails, type CreateCaseRequest, type UpdateCaseRequest, type VerificationDecision } from "@shared/types/caseTypes";
+import { CasePriority, CaseSeverity, CaseStatus, type Case, type CaseAttachment, type CaseComment, type CaseVerificationDetails, type CreateCaseRequest, type UpdateCaseRequest, type UpdateInvestigationRequest, type VerificationDecision } from "@shared/types/caseTypes";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 import { http, HttpResponse, delay } from 'msw';
 // Добавить моковые данные для верификации
@@ -250,7 +250,7 @@ let mockCases: Case[] = [
     id: 'CS-2024-004',
     title: 'Систематические задержки поставок',
     description: 'Поставщик ООО "Бета" систематически нарушает сроки поставки (7 случаев за 3 месяца).',
-    status: 'PENDING_VERIFICATION' as CaseStatus,
+    status: 'ACTION_PLAN' as CaseStatus,
     severity: 'LOW' as CaseSeverity,
     priority: 'NORMAL' as CasePriority,
     ownerId: '1',
@@ -365,7 +365,7 @@ export const casesHandlers = [
       total: mockCases.length,
       open: mockCases.filter(c => c.status === 'OPEN').length,
       inProgress: mockCases.filter(c => c.status === 'IN_PROGRESS').length,
-      investigation: mockCases.filter(c => c.status === 'INVESTIGATION').length,
+      investigation: mockCases.filter(c => c.status === 'INVESTIGATION' || c.status === 'ACTION_PLAN').length,
       pendingVerification: mockCases.filter(c => c.status === 'PENDING_VERIFICATION').length,
       closed: mockCases.filter(c => c.status === 'CLOSED').length,
       avgResolutionTime: 48, // В часах
@@ -441,6 +441,34 @@ export const casesHandlers = [
       updatedAt: new Date().toISOString(),
     };
     
+    return HttpResponse.json(mockCases[index]);
+  }),
+
+  // PATCH /cases/:caseId/investigation - Обновить расследование
+  http.patch(`${API_BASE_URL}/cases/:caseId/investigation`, async ({ request, params }) => {
+    await delay(400);
+    const { caseId } = params;
+    const body = await request.json() as UpdateInvestigationRequest;
+    console.log(`🕵️ [MSW] Updating investigation for case ${caseId}:`, body);
+
+    const index = mockCases.findIndex(c => c.id === caseId);
+
+    if (index === -1) {
+      return HttpResponse.json(
+        { message: 'Случай не найден', code: 'CASE_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+
+    mockCases[index] = {
+      ...mockCases[index],
+      investigationNotes: body.investigationNotes,
+      rootCause: body.rootCause,
+      requiresCorrectiveAction: body.requiresCorrectiveAction,
+      status: CaseStatus.INVESTIGATION,
+      updatedAt: new Date().toISOString(),
+    };
+
     return HttpResponse.json(mockCases[index]);
   }),
 

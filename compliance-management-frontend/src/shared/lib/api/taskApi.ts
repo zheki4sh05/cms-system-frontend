@@ -5,6 +5,7 @@ import type {
   Task,
   ActionPlan,
   CreateActionPlanRequest,
+  CreateActionPlanApiRequest,
   UpdateTaskRequest,
   TaskStatistics,
 } from '@shared/types/taskTypes';
@@ -72,7 +73,18 @@ export class TaskApi {
    * Создать план корректирующих действий
    */
   static async createActionPlan(data: CreateActionPlanRequest): Promise<ActionPlan> {
-    const response = await apiClient.post<ActionPlan>('/action-plans', data);
+    const payload: CreateActionPlanApiRequest = {
+      caseId: data.caseId,
+      title: data.title,
+      description: data.description,
+      tasks: data.tasks.map((task) => ({
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        dueDate: task.dueDate,
+      })),
+    };
+    const response = await apiClient.post<ActionPlan>('/api/action-plans', payload);
     return response.data;
   }
 

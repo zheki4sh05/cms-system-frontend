@@ -177,11 +177,10 @@ export const ManagerCasesPage: FC = observer(() => {
     if (!selectedCase) return;
     
     try {
-      await CaseApi.updateCase(selectedCase.id, {
+      await CaseApi.updateInvestigation(selectedCase.id, {
         investigationNotes,
         rootCause,
         requiresCorrectiveAction: requiresAction,
-        status: 'INVESTIGATION' as CaseStatus,
       });
       
       await loadCases();
@@ -229,6 +228,7 @@ export const ManagerCasesPage: FC = observer(() => {
       case 'OPEN': return 'info';
       case 'IN_PROGRESS': return 'warning';
       case 'INVESTIGATION': return 'primary';
+      case 'ACTION_PLAN': return 'warning';
       case 'PENDING_VERIFICATION': return 'secondary';
       case 'CLOSED': return 'success';
       case 'REJECTED': return 'error';
@@ -240,6 +240,7 @@ export const ManagerCasesPage: FC = observer(() => {
       OPEN: 'Открыт',
       IN_PROGRESS: 'В работе',
       INVESTIGATION: 'Расследование',
+      ACTION_PLAN: 'План действий',
       PENDING_VERIFICATION: 'На проверке',
       CLOSED: 'Закрыт',
       REJECTED: 'Отклонен',
