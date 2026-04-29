@@ -77,11 +77,13 @@ const mockDocuments = [
 ];
 
 export const DocumentsDrawer: FC<DocumentsDrawerProps> = ({ open, onClose }) => {
+  const appProfile = import.meta.env.VITE_APP_PROFILE ?? 'dev';
+  const documents = appProfile === 'test' ? [] : mockDocuments;
   const [searchQuery, setSearchQuery] = useState('');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
 
-  const filteredDocuments = mockDocuments.filter(doc => 
+  const filteredDocuments = documents.filter(doc => 
     doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     doc.category.toLowerCase().includes(searchQuery.toLowerCase())
   );

@@ -725,8 +725,8 @@ http.post(`${API_BASE_URL}/departments/transfer`, async ({ request }) => {
   });
 }),
 
-// POST /departments/:id/manager - Назначение руководителя
-http.post(`${API_BASE_URL}/departments/:id/manager`, async ({ request, params }) => {
+// POST /departments/:id/supervisor - Назначение руководителя
+http.post(`${API_BASE_URL}/departments/:id/supervisor`, async ({ request, params }) => {
   await delay(500);
 
   const { id } = params;

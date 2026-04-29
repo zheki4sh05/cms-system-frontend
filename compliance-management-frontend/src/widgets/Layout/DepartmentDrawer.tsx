@@ -30,6 +30,7 @@ import {
 import { useAuthStore } from '@features/auth/useAuthStore';
 import { CreateDepartmentDialog } from './CreateDepartmentDialog';
 import { EditDepartmentDialog } from './EditDepartmentDialog';
+import { AssignSupervisorDialog } from './AssignSupervisorDialog';
 import { type Department } from '@shared/types/departmentTypes';
 import { useState, useEffect, useCallback, type FC } from 'react';
 import { DepartmentApi } from '@shared/lib/api/departmentApi';
@@ -47,6 +48,7 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [assignSupervisorDialogOpen, setAssignSupervisorDialogOpen] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [menuDepartment, setMenuDepartment] = useState<Department | null>(null);
@@ -123,6 +125,14 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
     handleMenuClose();
   };
 
+  const handleAssignSupervisorOpen = () => {
+    if (menuDepartment) {
+      setSelectedDepartment(menuDepartment);
+      setAssignSupervisorDialogOpen(true);
+    }
+    handleMenuClose();
+  };
+
   const handleCreate = async (name: string, description?: string) => {
     const cid = companyId ?? authStore.user?.companyId ?? null;
     if (!cid) {
@@ -140,6 +150,12 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
 
   const handleUpdate = async (id: string, name: string, description?: string) => {
     await DepartmentApi.updateDepartment(id, { name, description });
+    await loadDepartments({ silent: true });
+  };
+
+  const handleAssignSupervisor = async (departmentId: string, managerId: string, cid?: string) => {
+    const resolvedCompanyId = cid ?? companyId ?? authStore.user?.companyId ?? undefined;
+    await DepartmentApi.assignManager(departmentId, managerId, resolvedCompanyId);
     await loadDepartments({ silent: true });
   };
 
@@ -287,14 +303,12 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
                         </Typography>
                       </Box>
 
-                      {dept.managerName && (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <PersonOutlineOutlined fontSize="small" color="action" />
-                          <Typography variant="body2" color="text.secondary">
-                            Руководитель: {dept.managerName}
-                          </Typography>
-                        </Box>
-                      )}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <PersonOutlineOutlined fontSize="small" color="action" />
+                        <Typography variant="body2" color="text.secondary">
+                          Руководитель: {dept.managerName || 'Не назначен'}
+                        </Typography>
+                      </Box>
                     </Stack>
 
                     {/* Dates */}
@@ -338,6 +352,12 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
           </ListItemIcon>
           Перевести сотрудников
         </MenuItem>
+        <MenuItem onClick={handleAssignSupervisorOpen}>
+          <ListItemIcon>
+            <PersonOutlineOutlined fontSize="small" />
+          </ListItemIcon>
+          Назначить руководителя
+        </MenuItem>
       </Menu>
 
       {/* Create Dialog */}
@@ -356,6 +376,17 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
         }}
         department={selectedDepartment}
         onUpdate={handleUpdate}
+      />
+
+      <AssignSupervisorDialog
+        open={assignSupervisorDialogOpen}
+        onClose={() => {
+          setAssignSupervisorDialogOpen(false);
+          setSelectedDepartment(null);
+        }}
+        department={selectedDepartment}
+        companyId={companyId}
+        onAssign={handleAssignSupervisor}
       />
     </>
   );

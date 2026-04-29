@@ -4,6 +4,8 @@ export interface Department {
   description?: string;
   managerId?: string;
   managerName?: string;
+  supervisorId?: string;
+  supervisorName?: string;
   employeeCount: number;
   createdAt: string;
   updatedAt: string;
