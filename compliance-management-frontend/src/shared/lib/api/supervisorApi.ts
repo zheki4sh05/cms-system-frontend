@@ -45,7 +45,7 @@ export class SupervisorApi {
     itemId: string,
     data: ApproveVerificationRequest
   ): Promise<void> {
-    await apiClient.post(`/supervisor/verification/${itemId}/process`, data);
+    await apiClient.put(`/supervisor/verification/${itemId}/process`, data);
   }
 
   /**

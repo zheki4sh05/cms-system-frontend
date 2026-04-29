@@ -408,8 +408,8 @@ export const supervisorHandlers = [
     return HttpResponse.json(mockVerificationQueue);
   }),
 
-  // POST /supervisor/verification/:itemId/process - Обработать верификацию
-  http.post(`${API_BASE_URL}/supervisor/verification/:itemId/process`, async ({ request, params }) => {
+  // PUT /supervisor/verification/:itemId/process - Обработать верификацию
+  http.put(`${API_BASE_URL}/supervisor/verification/:itemId/process`, async ({ request, params }) => {
     await delay(600);
     const { itemId } = params;
     const body = await request.json() as ApproveVerificationRequest;

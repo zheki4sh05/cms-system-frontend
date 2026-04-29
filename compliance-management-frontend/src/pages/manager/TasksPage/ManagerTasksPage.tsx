@@ -217,7 +217,7 @@ export const ManagerTasksPage: FC = observer(() => {
     try {
       await TaskApi.submitForVerification(selectedPlan.id);
       await CaseApi.updateCase(selectedPlan.caseId, {
-        status: 'PENDING_VERIFICATION' as CaseStatus,
+        status: 'WAITING_VERIFICATION' as CaseStatus,
       });
       await loadData();
       setViewPlanDialogOpen(false);

@@ -229,7 +229,8 @@ export const ManagerCasesPage: FC = observer(() => {
       case 'IN_PROGRESS': return 'warning';
       case 'INVESTIGATION': return 'primary';
       case 'ACTION_PLAN': return 'warning';
-      case 'PENDING_VERIFICATION': return 'secondary';
+      case 'ACTION_IN_PROGRESS': return 'info';
+      case 'WAITING_VERIFICATION': return 'secondary';
       case 'CLOSED': return 'success';
       case 'REJECTED': return 'error';
     }
@@ -241,7 +242,8 @@ export const ManagerCasesPage: FC = observer(() => {
       IN_PROGRESS: 'В работе',
       INVESTIGATION: 'Расследование',
       ACTION_PLAN: 'План действий',
-      PENDING_VERIFICATION: 'На проверке',
+      ACTION_IN_PROGRESS: 'План в работе',
+      WAITING_VERIFICATION: 'На проверке',
       CLOSED: 'Закрыт',
       REJECTED: 'Отклонен',
       ESCALATED_TO_CASE: 'Эскалация'

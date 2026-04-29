@@ -365,8 +365,13 @@ export const casesHandlers = [
       total: mockCases.length,
       open: mockCases.filter(c => c.status === 'OPEN').length,
       inProgress: mockCases.filter(c => c.status === 'IN_PROGRESS').length,
-      investigation: mockCases.filter(c => c.status === 'INVESTIGATION' || c.status === 'ACTION_PLAN').length,
-      pendingVerification: mockCases.filter(c => c.status === 'PENDING_VERIFICATION').length,
+      investigation: mockCases.filter(
+        c =>
+          c.status === 'INVESTIGATION'
+          || c.status === 'ACTION_PLAN'
+          || c.status === 'ACTION_IN_PROGRESS'
+      ).length,
+      pendingVerification: mockCases.filter(c => c.status === 'WAITING_VERIFICATION').length,
       closed: mockCases.filter(c => c.status === 'CLOSED').length,
       avgResolutionTime: 48, // В часах
     };
