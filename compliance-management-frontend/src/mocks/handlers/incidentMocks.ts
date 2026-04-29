@@ -76,7 +76,7 @@ let mockIncidents: Incident[] = [
       purchaseId: 'PO-2024-1234',
       amount: 850000,
       limit: 500000,
-      approvals: ['Менеджер по закупкам', 'Руководитель отдела'],
+      approvals: ['Менеджер', 'Руководитель отдела'],
       missingApproval: 'Финансовый директор',
     },
   },

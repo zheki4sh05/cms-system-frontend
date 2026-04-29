@@ -69,9 +69,9 @@ export const EmployeesDrawer: FC<EmployeesDrawerProps> = observer(({ open, onClo
   const getRoleLabel = (role: UserRole): string => {
     switch (role) {
       case UserRoleValues.MANAGER:
-        return 'Менеджер по закупкам';
+        return 'Менеджер';
       case UserRoleValues.SUPERVISOR:
-        return 'Руководитель закупок';
+        return 'Руководитель';
       case UserRoleValues.EXECUTIVE:
         return 'ТОП-менеджмент';
       default:

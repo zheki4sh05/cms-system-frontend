@@ -46,9 +46,9 @@ export const ProfileDrawer: FC<ProfileDrawerProps> = observer(({ open, onClose }
   const getRoleLabel = () => {
     switch (authStore.userRole) {
       case 'MANAGER':
-        return 'Менеджер по закупкам';
+        return 'Менеджер';
       case 'SUPERVISOR':
-        return 'Руководитель закупок';
+        return 'Руководитель';
       case 'EXECUTIVE':
         return 'ТОП-менеджмент';
       default:

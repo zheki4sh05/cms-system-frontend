@@ -126,8 +126,8 @@ export const RegisterForm: FC = observer(() => {
             onChange={(e) =>handleChange(e as React.ChangeEvent<{ name?: string; value: unknown }>)
   }
           >
-            <MenuItem value={UserRoleValues.MANAGER}>Менеджер по закупкам</MenuItem>
-            <MenuItem value={UserRoleValues.SUPERVISOR}>Руководитель закупок</MenuItem>
+            <MenuItem value={UserRoleValues.MANAGER}>Менеджер</MenuItem>
+            <MenuItem value={UserRoleValues.SUPERVISOR}>Руководитель</MenuItem>
             <MenuItem value={UserRoleValues.EXECUTIVE}>ТОП-менеджмент</MenuItem>
           </Select>
         </FormControl>
