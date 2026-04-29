@@ -15,6 +15,7 @@ import { analyticsHandlers } from './handlers/analyticHandler';
 import { rulesHandlers } from './handlers/rulesHandler';
 import { strategicHandlers } from './handlers/strategicHandlers';
 import { notificationHandlers } from './handlers/notificationhandlers';
+import { archiveHandlers } from './handlers/archiveHandlers';
 
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
@@ -854,6 +855,7 @@ http.patch(`${API_BASE_URL}/company`, async ({ request }) => {
   ...analyticsHandlers, 
   ...rulesHandlers,
   ...strategicHandlers,
-  ...notificationHandlers
+  ...notificationHandlers,
+  ...archiveHandlers
 
 ];

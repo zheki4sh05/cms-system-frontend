@@ -34,6 +34,7 @@ import { ManagerHelpPage } from '@pages/help/ManagerHelpPage';
 import { SupervisorHelpPage } from '@pages/help/SuperVisorHelpPage';
 import { ExecutiveHelpPage } from '@pages/help/ExecutiveHelpPage';
 import { ManagerRulesPage } from '@pages/manager/RulesPage/RulesPage';
+import { ArchivePage } from '@pages/archive/ArchivePage';
 
 export const RouterProvider: FC = observer(() => {
   return (
@@ -55,7 +56,7 @@ export const RouterProvider: FC = observer(() => {
                   <Route path="incidents" element={<ManagerIncidentsPage />} />
                  <Route path="cases" element={<ManagerCasesPage />} />
                 <Route path="tasks" element={<ManagerTasksPage />} />
-
+                  <Route path="archive" element={<ArchivePage />} />
                   <Route path="rules" element={<ManagerRulesPage />} />
                   <Route path="help" element={<ManagerHelpPage />} />
                 </Routes>
@@ -76,8 +77,9 @@ export const RouterProvider: FC = observer(() => {
                   <Route path="cases" element={<SupervisorCasesPage />} />
                   <Route path="incidents" element={<SupervisorIncidentsPage />} />
                   <Route path="analytics" element={<SupervisorAnalyticsPage />} />
+                  <Route path="archive" element={<ArchivePage />} />
                   <Route path="rules" element={<SupervisorRulesPage />} />
-                   <Route path="help" element={<SupervisorHelpPage />} />
+                  <Route path="help" element={<SupervisorHelpPage />} />
                 </Routes>
               </AppLayout>
             </ProtectedRoute>
@@ -93,7 +95,8 @@ export const RouterProvider: FC = observer(() => {
                 <Routes>
                   <Route path="dashboard" element={<ExecutiveDashboardPage />} />
                   <Route path="reports" element={<ExecutiveReportsPage />} />
-                    <Route path="help" element={<ExecutiveHelpPage />} />
+                  <Route path="archive" element={<ArchivePage />} />
+                  <Route path="help" element={<ExecutiveHelpPage />} />
                 </Routes>
               </AppLayout>
             </ProtectedRoute>
