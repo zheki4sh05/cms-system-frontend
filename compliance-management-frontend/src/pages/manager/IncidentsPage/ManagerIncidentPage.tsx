@@ -309,14 +309,42 @@ export const ManagerIncidentsPage: FC = observer(() => {
     return labels[category];
   };
 
+  const stringifyCategoryValue = (value: unknown): string => {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (value && typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return '-';
+      }
+    }
+    return '-';
+  };
+
+  const getIncidentDescription = (incident: Incident): string => {
+    return incident.incidentDescription || incident.description || '-';
+  };
+
+  const getCategoryDisplay = (incident: Incident): string => {
+    if (incident.categoryName != null) {
+      return stringifyCategoryValue(incident.categoryName);
+    }
+    if (incident.categoryId != null) {
+      return stringifyCategoryValue(incident.categoryId);
+    }
+    return getCategoryLabel(incident.category);
+  };
+
   const filteredIncidents = incidents.filter(i => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
-        i.title.toLowerCase().includes(query) ||
-        i.description.toLowerCase().includes(query) ||
-        i.id.toLowerCase().includes(query) ||
-        i.ruleName.toLowerCase().includes(query)
+        (i.riskObjectId || '').toLowerCase().includes(query) ||
+        (i.riskObjectName || '').toLowerCase().includes(query) ||
+        getIncidentDescription(i).toLowerCase().includes(query) ||
+        stringifyCategoryValue(i.categoryName).toLowerCase().includes(query) ||
+        stringifyCategoryValue(i.categoryId).toLowerCase().includes(query)
       );
     }
     return true;
@@ -546,7 +574,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
         <Paper sx={{ p: 2, mb: 3 }}>
           <TextField
             fullWidth
-            placeholder="Поиск по названию, описанию, ID или правилу..."
+            placeholder="Поиск по объекту риска, описанию и категории..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             InputProps={{
@@ -591,9 +619,9 @@ export const ManagerIncidentsPage: FC = observer(() => {
                         onChange={handleSelectAll}
                       />
                     </TableCell>
-                    <TableCell>ID</TableCell>
-                    <TableCell>Название</TableCell>
-                    <TableCell>Правило</TableCell>
+                    <TableCell>№</TableCell>
+                    <TableCell>Объект риска</TableCell>
+                    <TableCell>Описание инцидента</TableCell>
                     <TableCell>Категория</TableCell>
                     <TableCell>Критичность</TableCell>
                     <TableCell>Обнаружен</TableCell>
@@ -601,7 +629,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {newIncidents.map((incident) => (
+                  {newIncidents.map((incident, index) => (
                     <TableRow key={incident.id} hover>
                       <TableCell padding="checkbox">
                         <Checkbox
@@ -609,22 +637,19 @@ export const ManagerIncidentsPage: FC = observer(() => {
                           onChange={() => handleSelectIncident(incident.id)}
                         />
                       </TableCell>
-                      <TableCell>{incident.id}</TableCell>
+                      <TableCell>{index + 1}</TableCell>
                       <TableCell>
                         <Typography variant="body2" fontWeight="medium">
-                          {incident.title}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {incident.description.substring(0, 60)}...
+                          {incident.riskObjectName || '-'}
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Tooltip title={incident.ruleExpression || ''}>
-                          <Chip label={incident.ruleName} size="small" variant="outlined" />
-                        </Tooltip>
+                        <Typography variant="body2">
+                          {getIncidentDescription(incident)}
+                        </Typography>
                       </TableCell>
                       <TableCell>
-                        <Chip label={getCategoryLabel(incident.category)} size="small" />
+                        <Chip label={getCategoryDisplay(incident)} size="small" />
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -674,9 +699,9 @@ export const ManagerIncidentsPage: FC = observer(() => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>ID</TableCell>
-                    <TableCell>Название</TableCell>
-                    <TableCell>Правило</TableCell>
+                    <TableCell>№</TableCell>
+                    <TableCell>Объект риска</TableCell>
+                    <TableCell>Описание инцидента</TableCell>
                     <TableCell>Категория</TableCell>
                     <TableCell>Критичность</TableCell>
                     <TableCell>Статус</TableCell>
@@ -685,24 +710,21 @@ export const ManagerIncidentsPage: FC = observer(() => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {myIncidents.map((incident) => (
+                  {myIncidents.map((incident, index) => (
                     <TableRow key={incident.id} hover>
-                      <TableCell>{incident.id}</TableCell>
+                      <TableCell>{index + 1}</TableCell>
                       <TableCell>
                         <Typography variant="body2" fontWeight="medium">
-                          {incident.title}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {incident.description.substring(0, 60)}...
+                          {incident.riskObjectName || '-'}
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Tooltip title={incident.ruleExpression || ''}>
-                          <Chip label={incident.ruleName} size="small" variant="outlined" />
-                        </Tooltip>
+                        <Typography variant="body2">
+                          {getIncidentDescription(incident)}
+                        </Typography>
                       </TableCell>
                       <TableCell>
-                        <Chip label={getCategoryLabel(incident.category)} size="small" />
+                        <Chip label={getCategoryDisplay(incident)} size="small" />
                       </TableCell>
                       <TableCell>
                         <Chip
@@ -759,8 +781,9 @@ export const ManagerIncidentsPage: FC = observer(() => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>ID</TableCell>
-                    <TableCell>Название</TableCell>
+                    <TableCell>№</TableCell>
+                    <TableCell>Объект риска</TableCell>
+                    <TableCell>Описание инцидента</TableCell>
                     <TableCell>Категория</TableCell>
                     <TableCell>Статус</TableCell>
                     <TableCell>Решен</TableCell>
@@ -769,16 +792,21 @@ export const ManagerIncidentsPage: FC = observer(() => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {resolvedIncidents.map((incident) => (
+                  {resolvedIncidents.map((incident, index) => (
                     <TableRow key={incident.id} hover sx={{ opacity: 0.8 }}>
-                      <TableCell>{incident.id}</TableCell>
+                      <TableCell>{index + 1}</TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {incident.title}
+                          {incident.riskObjectName || '-'}
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Chip label={getCategoryLabel(incident.category)} size="small" />
+                        <Typography variant="body2">
+                          {getIncidentDescription(incident)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={getCategoryDisplay(incident)} size="small" />
                       </TableCell>
                       <TableCell>
                         <Chip

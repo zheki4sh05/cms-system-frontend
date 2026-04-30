@@ -16,6 +16,64 @@ import type {
 import type { Case } from '@shared/types/caseTypes';
 
 export class IncidentApi {
+  private static normalizeSeverity(severity: unknown): Incident['severity'] {
+    if (typeof severity !== 'string') return 'LOW';
+    const normalized = severity.toUpperCase();
+    if (
+      normalized === 'LOW' ||
+      normalized === 'MEDIUM' ||
+      normalized === 'HIGH' ||
+      normalized === 'CRITICAL'
+    ) {
+      return normalized;
+    }
+    return 'LOW';
+  }
+
+  private static normalizeIncident(incident: Partial<Incident>): Incident {
+    const riskObjectName = typeof incident.riskObjectName === 'string' ? incident.riskObjectName : '';
+    const incidentDescription =
+      typeof incident.incidentDescription === 'string' ? incident.incidentDescription : '';
+    const detectedAt =
+      typeof incident.detectedAt === 'string' && incident.detectedAt.length > 0
+        ? incident.detectedAt
+        : new Date().toISOString();
+
+    return {
+      id: incident.id || '',
+      riskObjectId: incident.riskObjectId,
+      riskObjectName: incident.riskObjectName,
+      incidentDescription: incident.incidentDescription,
+      categoryId: incident.categoryId,
+      categoryName: incident.categoryName,
+      title: incident.title || riskObjectName || 'Инцидент',
+      description: incident.description || incidentDescription || '-',
+      status: incident.status || 'ASSIGNED',
+      severity: this.normalizeSeverity(incident.severity),
+      category: incident.category || 'COMPLIANCE',
+      ruleId: incident.ruleId || '',
+      ruleName: incident.ruleName || '-',
+      ruleExpression: incident.ruleExpression,
+      assignedTo: incident.assignedTo || '',
+      assignedToName: incident.assignedToName || '',
+      detectedAt,
+      createdAt: incident.createdAt || detectedAt,
+      updatedAt: incident.updatedAt || detectedAt,
+      resolvedAt: incident.resolvedAt,
+      caseId: incident.caseId,
+      caseTitle: incident.caseTitle,
+      sourceSystem: incident.sourceSystem || '-',
+      sourceEventId: incident.sourceEventId || '',
+      payloadJson: incident.payloadJson,
+      vendorId: incident.vendorId,
+      vendorName: incident.vendorName,
+      amount: incident.amount,
+      departmentId: incident.departmentId,
+      resolutionNotes: incident.resolutionNotes,
+      falsePositiveReason: incident.falsePositiveReason,
+    };
+  }
+
   /**
    * Получить все инциденты текущего пользователя
    */
@@ -31,8 +89,8 @@ export class IncidentApi {
       if (filter.searchQuery) params.append('q', filter.searchQuery);
     }
     
-    const response = await apiClient.get<Incident[]>(`/incidents/my?${params.toString()}`);
-    return response.data;
+    const response = await apiClient.get<Partial<Incident>[]>(`/incidents/my?${params.toString()}`);
+    return response.data.map((incident) => this.normalizeIncident(incident));
   }
 
   /**

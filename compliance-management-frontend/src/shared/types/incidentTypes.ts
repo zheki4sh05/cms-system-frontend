@@ -87,6 +87,11 @@ export enum IncidentCategory {
 
 export interface Incident {
   id: string;
+  riskObjectId?: string;
+  riskObjectName?: string;
+  incidentDescription?: string;
+  categoryId?: unknown;
+  categoryName?: unknown;
   title: string;
   description: string;
   status: IncidentStatus;
