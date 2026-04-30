@@ -16,6 +16,25 @@ import type {
 import type { Case } from '@shared/types/caseTypes';
 
 export class IncidentApi {
+  private static normalizeStatus(status: unknown): Incident['status'] {
+    if (typeof status !== 'string') return 'NEW';
+    const normalized = status.toUpperCase();
+    const statusMap: Record<string, Incident['status']> = {
+      NEW: 'NEW',
+      OPEN: 'NEW',
+      ASSIGNED: 'ASSIGNED',
+      PARTLY_PROGRESS: 'ASSIGNED',
+      IN_PROGRESS: 'IN_REVIEW',
+      IN_REVIEW: 'IN_REVIEW',
+      RESOLVED: 'RESOLVED',
+      CLOSED: 'RESOLVED',
+      FALSE_POSITIVE: 'FALSE_POSITIVE',
+      ESCALATED_TO_CASE: 'ESCALATED_TO_CASE',
+    };
+
+    return statusMap[normalized] || 'NEW';
+  }
+
   private static normalizeSeverity(severity: unknown): Incident['severity'] {
     if (typeof severity !== 'string') return 'LOW';
     const normalized = severity.toUpperCase();
@@ -48,7 +67,7 @@ export class IncidentApi {
       categoryName: incident.categoryName,
       title: incident.title || riskObjectName || 'Инцидент',
       description: incident.description || incidentDescription || '-',
-      status: incident.status || 'ASSIGNED',
+      status: this.normalizeStatus(incident.status),
       severity: this.normalizeSeverity(incident.severity),
       category: incident.category || 'COMPLIANCE',
       ruleId: incident.ruleId || '',

@@ -135,14 +135,19 @@ export const ManagerIncidentsPage: FC = observer(() => {
   const loadIncidents = async () => {
     try {
       setLoading(true);
-      const [incidentsData, statsData] = await Promise.all([
-        IncidentApi.getMyIncidents(filters),
-        IncidentApi.getIncidentStatistics(),
-      ]);
+      const incidentsData = await IncidentApi.getMyIncidents(filters);
       setIncidents(incidentsData);
-      setStatistics(statsData);
+
+      try {
+        const statsData = await IncidentApi.getIncidentStatistics();
+        setStatistics(statsData);
+      } catch (statsError) {
+        console.error('Failed to load incident statistics:', statsError);
+        setStatistics(null);
+      }
     } catch (error) {
       console.error('Failed to load incidents:', error);
+      setIncidents([]);
     } finally {
       setLoading(false);
     }
@@ -288,8 +293,8 @@ export const ManagerIncidentsPage: FC = observer(() => {
   const getStatusLabel = (status: IncidentStatus) => {
     const labels = {
       NEW: 'Новый',
-      ASSIGNED: 'Назначен',
-      IN_REVIEW: 'На проверке',
+      ASSIGNED: 'Начатые',
+      IN_REVIEW: 'В работе',
       RESOLVED: 'Решен',
       FALSE_POSITIVE: 'Ложное срабатывание',
       ESCALATED_TO_CASE: 'Эскалирован в случай',
@@ -351,9 +356,8 @@ export const ManagerIncidentsPage: FC = observer(() => {
   });
 
   const newIncidents = filteredIncidents.filter(i => i.status === 'NEW');
-  const myIncidents = filteredIncidents.filter(i => 
-    i.status === 'ASSIGNED' || i.status === 'IN_REVIEW'
-  );
+  const startedIncidents = filteredIncidents.filter(i => i.status === 'ASSIGNED');
+  const inProgressIncidents = filteredIncidents.filter(i => i.status === 'IN_REVIEW');
   const resolvedIncidents = filteredIncidents.filter(i => 
     i.status === 'RESOLVED' || i.status === 'FALSE_POSITIVE' || i.status === 'ESCALATED_TO_CASE'
   );
@@ -411,7 +415,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
               </Card>
             </Grid>
             <Grid size={{xs:12, sm:6, md: 3}}>
-              <Card sx={{ cursor: 'pointer' }} onClick={() => setTabValue(1)}>
+              <Card sx={{ cursor: 'pointer' }} onClick={() => setTabValue(2)}>
                 <CardContent sx={{ textAlign: 'center' }}>
                   <StartIcon sx={{ fontSize: 40, color: 'warning.main' }} />
                   <Typography variant="h5" sx={{ mt: 2 }}>
@@ -422,7 +426,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
               </Card>
             </Grid>
             <Grid size={{xs:12, sm:6, md: 3}}>
-              <Card sx={{ cursor: 'pointer' }} onClick={() => setTabValue(2)}>
+              <Card sx={{ cursor: 'pointer' }} onClick={() => setTabValue(3)}>
                 <CardContent sx={{ textAlign: 'center' }}>
                   <CheckIcon sx={{ fontSize: 40, color: 'success.main' }} />
                   <Typography variant="h5" sx={{ mt: 2 }}>{statistics.resolved}</Typography>
@@ -595,7 +599,8 @@ export const ManagerIncidentsPage: FC = observer(() => {
             sx={{ borderBottom: 1, borderColor: 'divider' }}
           >
             <Tab label={`Новые (${newIncidents.length})`} />
-            <Tab label={`В работе (${myIncidents.length})`} />
+            <Tab label={`Начатые (${startedIncidents.length})`} />
+            <Tab label={`В работе (${inProgressIncidents.length})`} />
             <Tab label={`Решенные (${resolvedIncidents.length})`} />
           </Tabs>
 
@@ -693,7 +698,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
             )}
           </TabPanel>
 
-          {/* Вкладка "В работе" */}
+          {/* Вкладка "Начатые" */}
           <TabPanel value={tabValue} index={1}>
             <TableContainer>
               <Table>
@@ -710,7 +715,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {myIncidents.map((incident, index) => (
+                  {startedIncidents.map((incident, index) => (
                     <TableRow key={incident.id} hover>
                       <TableCell>{index + 1}</TableCell>
                       <TableCell>
@@ -765,7 +770,89 @@ export const ManagerIncidentsPage: FC = observer(() => {
               </Table>
             </TableContainer>
 
-            {myIncidents.length === 0 && (
+            {startedIncidents.length === 0 && (
+              <Box sx={{ textAlign: 'center', py: 8 }}>
+                <InfoIcon sx={{ fontSize: 64, color: 'info.main', mb: 2 }} />
+                <Typography variant="h6" color="text.secondary">
+                  Нет начатых инцидентов
+                </Typography>
+              </Box>
+            )}
+          </TabPanel>
+
+          {/* Вкладка "В работе" */}
+          <TabPanel value={tabValue} index={2}>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>№</TableCell>
+                    <TableCell>Объект риска</TableCell>
+                    <TableCell>Описание инцидента</TableCell>
+                    <TableCell>Категория</TableCell>
+                    <TableCell>Критичность</TableCell>
+                    <TableCell>Статус</TableCell>
+                    <TableCell>Обнаружен</TableCell>
+                    <TableCell align="right">Действия</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {inProgressIncidents.map((incident, index) => (
+                    <TableRow key={incident.id} hover>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="medium">
+                          {incident.riskObjectName || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {getIncidentDescription(incident)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={getCategoryDisplay(incident)} size="small" />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={incident.severity}
+                          color={getSeverityColor(incident.severity)}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={getStatusLabel(incident.status)}
+                          color={getStatusColor(incident.status)}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {new Date(incident.detectedAt).toLocaleString('ru-RU')}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Tooltip title="Просмотр">
+                          <IconButton size="small" onClick={() => handleOpenIncident(incident)}>
+                            <ViewIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Решить">
+                          <IconButton
+                            size="small"
+                            color="success"
+                            onClick={() => handleOpenResolveDialog(incident)}
+                          >
+                            <ResolveIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            {inProgressIncidents.length === 0 && (
               <Box sx={{ textAlign: 'center', py: 8 }}>
                 <InfoIcon sx={{ fontSize: 64, color: 'info.main', mb: 2 }} />
                 <Typography variant="h6" color="text.secondary">
@@ -776,7 +863,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
           </TabPanel>
 
           {/* Вкладка "Решенные" */}
-          <TabPanel value={tabValue} index={2}>
+          <TabPanel value={tabValue} index={3}>
             <TableContainer>
               <Table>
                 <TableHead>
