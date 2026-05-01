@@ -179,3 +179,55 @@ export interface IncidentFilter {
   assignedTo?: string;
   searchQuery?: string;
 }
+
+export interface IncidentFindingView {
+  id: string;
+  priority: string;
+  assignedUserId?: unknown;
+  rulesId?: unknown;
+  detectedAt: string;
+  details?: Record<string, unknown>;
+  incidentId: string;
+}
+
+export interface IncidentViewDto {
+  findings: IncidentFindingView[];
+  documentId?: unknown;
+  integrationId?: number;
+  integrationName?: unknown;
+}
+
+export interface RuleShortInfo {
+  id: string;
+  companyId: string;
+  name: string;
+  condition: string;
+  categoryId: string;
+  priority: string;
+  responsibleUserId: string;
+}
+
+export interface UserBasicInfo {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  email?: string;
+}
+
+export interface AssignToMeResponse {
+  id: string;
+  incidentId: string;
+  findingId: string;
+  assignedUserId?: unknown;
+  status: string;
+  investigation?: {
+    id: string;
+    caseId: string;
+    investigationNotes: string;
+    rootCause: string;
+    requiresCorrectiveAction: boolean;
+    createdAt: string;
+    updatedAt: string;
+  };
+}

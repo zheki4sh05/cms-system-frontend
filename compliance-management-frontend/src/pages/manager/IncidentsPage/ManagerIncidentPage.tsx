@@ -38,15 +38,8 @@ import {
   Stack,
   Tabs,
   Tab,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
   Collapse,
-  FormControlLabel,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
+  MobileStepper,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -57,15 +50,16 @@ import {
   Warning as WarningIcon,
   FolderOpen as CaseIcon,
   Info as InfoIcon,
-  ExpandMore as ExpandMoreIcon,
   PlayArrow as StartIcon,
   CheckCircle as ResolveIcon,
-  Error as ErrorIcon,
-  TrendingUp as TrendingUpIcon,
   BarChart as ChartIcon,
+  NavigateBefore as NavigateBeforeIcon,
+  NavigateNext as NavigateNextIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { IncidentApi } from '@shared/lib/api/incidentApi';
+import { RuleApi } from '@shared/lib/api/ruleApi';
+import { useAuthStore } from '@features/auth/useAuthStore';
 import {
   type Incident,
   IncidentStatus,
@@ -73,6 +67,8 @@ import {
   type IncidentCategory,
   type IncidentStatistics,
   type IncidentFilter,
+  type IncidentViewDto,
+  type RuleShortInfo,
 } from '@shared/types/incidentTypes';
 
 interface TabPanelProps {
@@ -92,6 +88,7 @@ function TabPanel(props: TabPanelProps) {
 
 export const ManagerIncidentsPage: FC = observer(() => {
   const navigate = useNavigate();
+  const authStore = useAuthStore();
   
   const [loading, setLoading] = useState(true);
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -114,8 +111,22 @@ export const ManagerIncidentsPage: FC = observer(() => {
   // Выбранный инцидент
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   
-  // Похожие инциденты
-  const [similarIncidents, setSimilarIncidents] = useState<Incident[]>([]);
+  const [incidentViewLoading, setIncidentViewLoading] = useState(false);
+  const [incidentViewData, setIncidentViewData] = useState<IncidentViewDto | null>(null);
+  const [findingSlides, setFindingSlides] = useState<
+    Array<{
+      findingId: string;
+      rule: RuleShortInfo | null;
+      responsibleUserName: string;
+      details: {
+        title?: string;
+        severity?: string;
+        description?: string;
+        recommendation?: string;
+      };
+    }>
+  >([]);
+  const [activeFindingIndex, setActiveFindingIndex] = useState(0);
   
   // Форма резолюции
   const [resolutionType, setResolutionType] = useState<'resolved' | 'false_positive'>('resolved');
@@ -153,24 +164,104 @@ export const ManagerIncidentsPage: FC = observer(() => {
     }
   };
 
+  const normalizeId = (value: unknown): string => {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return '';
+  };
+
   const handleOpenIncident = async (incident: Incident) => {
     setSelectedIncident(incident);
     setViewDialogOpen(true);
-    
-    // Загрузить похожие инциденты
+    setIncidentViewLoading(true);
+    setIncidentViewData(null);
+    setFindingSlides([]);
+    setActiveFindingIndex(0);
+
     try {
-      const similar = await IncidentApi.getSimilarIncidents(incident.id);
-      setSimilarIncidents(similar);
+      const viewData = await IncidentApi.getIncidentView(incident.id);
+      setIncidentViewData(viewData);
+
+      const currentUserId = authStore.user?.id;
+      const rulesIds = viewData.findings
+        .map((finding) => normalizeId(finding.rulesId))
+        .filter((id) => id.length > 0);
+
+      const uniqueRuleIds = Array.from(new Set(rulesIds));
+      const ruleEntries = await Promise.all(
+        uniqueRuleIds.map(async (ruleId) => {
+          try {
+            const rule = await RuleApi.getRuleShort(ruleId);
+            return [ruleId, rule] as const;
+          } catch (ruleError) {
+            console.error(`Failed to load short rule ${ruleId}:`, ruleError);
+            return [ruleId, null] as const;
+          }
+        })
+      );
+      const ruleMap = new Map<string, RuleShortInfo | null>(ruleEntries);
+
+      const responsibleUserIds = Array.from(
+        new Set(
+          ruleEntries
+            .map(([, rule]) => rule?.responsibleUserId ?? '')
+            .filter((id) => id.length > 0 && id !== currentUserId)
+        )
+      );
+
+      const userEntries = await Promise.all(
+        responsibleUserIds.map(async (userId) => {
+          try {
+            const user = await IncidentApi.getUserBasicInfo(userId);
+            const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+            return [userId, user.fullName || fullName || user.email || userId] as const;
+          } catch (userError) {
+            console.error(`Failed to load user ${userId}:`, userError);
+            return [userId, userId] as const;
+          }
+        })
+      );
+      const userNameMap = new Map<string, string>(userEntries);
+
+      const slides = viewData.findings.map((finding) => {
+        const ruleId = normalizeId(finding.rulesId);
+        const rule = ruleMap.get(ruleId) ?? null;
+        const responsibleUserId = rule?.responsibleUserId ?? '';
+        const rawDetails = (finding.details ?? {}) as Record<string, unknown>;
+        const responsibleUserName =
+          responsibleUserId && currentUserId && responsibleUserId === currentUserId
+            ? 'Вы'
+            : userNameMap.get(responsibleUserId) || responsibleUserId || '-';
+
+        return {
+          findingId: finding.id,
+          rule,
+          responsibleUserName,
+          details: {
+            title: typeof rawDetails.title === 'string' ? rawDetails.title : undefined,
+            severity: typeof rawDetails.severity === 'string' ? rawDetails.severity : undefined,
+            description: typeof rawDetails.description === 'string' ? rawDetails.description : undefined,
+            recommendation:
+              typeof rawDetails.recommendation === 'string' ? rawDetails.recommendation : undefined,
+          },
+        };
+      });
+      setFindingSlides(slides);
     } catch (error) {
-      console.error('Failed to load similar incidents:', error);
-      setSimilarIncidents([]);
+      console.error('Failed to load incident view:', error);
+      setIncidentViewData(null);
+      setFindingSlides([]);
+    } finally {
+      setIncidentViewLoading(false);
     }
   };
 
   const handleCloseViewDialog = () => {
     setViewDialogOpen(false);
     setSelectedIncident(null);
-    setSimilarIncidents([]);
+    setIncidentViewData(null);
+    setFindingSlides([]);
+    setActiveFindingIndex(0);
   };
 
   const handleOpenResolveDialog = (incident: Incident) => {
@@ -263,7 +354,37 @@ export const ManagerIncidentsPage: FC = observer(() => {
 
   const handleAssignToMe = async (incidentId: string) => {
     try {
-      await IncidentApi.assignToMe(incidentId);
+      const assignResult = await IncidentApi.assignToMe(incidentId);
+      const targetIncidentId = assignResult.incidentId || incidentId;
+      const normalized = assignResult.status.toUpperCase();
+      const statusMap: Record<string, IncidentStatus> = {
+        NEW: 'NEW',
+        OPEN: 'NEW',
+        ASSIGNED: 'ASSIGNED',
+        PARTLY_PROGRESS: 'ASSIGNED',
+        IN_PROGRESS: 'IN_REVIEW',
+        IN_REVIEW: 'IN_REVIEW',
+        RESOLVED: 'RESOLVED',
+        CLOSED: 'RESOLVED',
+        FALSE_POSITIVE: 'FALSE_POSITIVE',
+        ESCALATED_TO_CASE: 'ESCALATED_TO_CASE',
+      };
+      const nextStatus = statusMap[normalized] || 'NEW';
+
+      setIncidents((prev) =>
+        prev.map((incident) =>
+          incident.id === targetIncidentId
+            ? { ...incident, status: nextStatus, assignedTo: authStore.user?.id || incident.assignedTo }
+            : incident
+        )
+      );
+      setSelectedIncident((prev) =>
+        prev && prev.id === targetIncidentId
+          ? { ...prev, status: nextStatus, assignedTo: authStore.user?.id || prev.assignedTo }
+          : prev
+      );
+
+      // Финальная синхронизация, если сервер вернул дополнительные изменения
       await loadIncidents();
     } catch (error) {
       console.error('Failed to assign incident:', error);
@@ -341,6 +462,28 @@ export const ManagerIncidentsPage: FC = observer(() => {
     return getCategoryLabel(incident.category);
   };
 
+  const getPriorityLabel = (priority?: string): string => {
+    if (!priority) return '-';
+    const labels: Record<string, string> = {
+      LOW: 'Низкий',
+      MEDIUM: 'Средний',
+      HIGH: 'Высокий',
+      CRITICAL: 'Критичный',
+    };
+    return labels[priority.toUpperCase()] || priority;
+  };
+
+  const getSeverityLabel = (severity?: string): string => {
+    if (!severity) return '-';
+    const labels: Record<string, string> = {
+      LOW: 'Низкая',
+      MEDIUM: 'Средняя',
+      HIGH: 'Высокая',
+      CRITICAL: 'Критичная',
+    };
+    return labels[severity.toUpperCase()] || severity;
+  };
+
   const filteredIncidents = incidents.filter(i => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -361,6 +504,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
   const resolvedIncidents = filteredIncidents.filter(i => 
     i.status === 'RESOLVED' || i.status === 'FALSE_POSITIVE' || i.status === 'ESCALATED_TO_CASE'
   );
+  const activeFindingSlide = findingSlides[activeFindingIndex] || null;
 
   if (loading) {
     return (
@@ -955,7 +1099,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
               <DialogTitle>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Box>
-                    <Typography variant="h6">{selectedIncident.title}</Typography>
+                    <Typography variant="h6">{selectedIncident.riskObjectName || selectedIncident.title}</Typography>
                     <Typography variant="caption" color="text.secondary">
                       ID: {selectedIncident.id}
                     </Typography>
@@ -979,128 +1123,140 @@ export const ManagerIncidentsPage: FC = observer(() => {
               </DialogTitle>
 
               <DialogContent>
-                <Typography variant="body1" paragraph>
-                  {selectedIncident.description}
-                </Typography>
-
-                <Divider sx={{ my: 2 }} />
-
                 <Grid container spacing={2}>
-                  <Grid size={{xs:6}}>
-                    <Typography variant="caption" color="text.secondary">Правило</Typography>
-                    <Typography variant="body2">{selectedIncident.ruleName}</Typography>
-                  </Grid>
-                  <Grid size={{xs:6}}>
+                  <Grid size={{ xs: 6 }}>
                     <Typography variant="caption" color="text.secondary">Категория</Typography>
-                    <Typography variant="body2">{getCategoryLabel(selectedIncident.category)}</Typography>
+                    <Typography variant="body2">{getCategoryDisplay(selectedIncident)}</Typography>
                   </Grid>
-                  <Grid size={{xs:6}}>
-                    <Typography variant="caption" color="text.secondary">Источник</Typography>
-                    <Typography variant="body2">{selectedIncident.sourceSystem}</Typography>
-                  </Grid>
-                  <Grid size={{xs:6}}>
-                    <Typography variant="caption" color="text.secondary">Обнаружен</Typography>
+                  <Grid size={{ xs: 6 }}>
+                    <Typography variant="caption" color="text.secondary">Дата обнаружения</Typography>
                     <Typography variant="body2">
                       {new Date(selectedIncident.detectedAt).toLocaleString('ru-RU')}
                     </Typography>
                   </Grid>
-                  {selectedIncident.vendorName && (
-                    <Grid size={{xs:6}}>
-                      <Typography variant="caption" color="text.secondary">Поставщик</Typography>
-                      <Typography variant="body2">{selectedIncident.vendorName}</Typography>
-                    </Grid>
-                  )}
-                  {selectedIncident.amount && (
-                    <Grid size={{xs:6}}>
-                      <Typography variant="caption" color="text.secondary">Сумма</Typography>
-                      <Typography variant="body2">
-                        {selectedIncident.amount.toLocaleString('ru-RU')} ₽
-                      </Typography>
-                    </Grid>
-                  )}
+                  <Grid size={{ xs: 6 }}>
+                    <Typography variant="caption" color="text.secondary">Интеграция</Typography>
+                    <Typography variant="body2">
+                      {stringifyCategoryValue(incidentViewData?.integrationName)}
+                    </Typography>
+                  </Grid>
+                  <Grid size={{ xs: 6 }}>
+                    <Typography variant="caption" color="text.secondary">ID документа</Typography>
+                    <Typography variant="body2">
+                      {stringifyCategoryValue(incidentViewData?.documentId)}
+                    </Typography>
+                  </Grid>
                 </Grid>
 
-                {selectedIncident.caseId && (
-                  <>
-                    <Divider sx={{ my: 2 }} />
-                    <Alert severity="info">
-                      <Typography variant="body2">
-                        <strong>Связанный случай:</strong> {selectedIncident.caseTitle || selectedIncident.caseId}
-                      </Typography>
-                    </Alert>
-                  </>
+                <Divider sx={{ my: 2 }} />
+
+                <Typography variant="subtitle2" gutterBottom>
+                  Обнаруженные риски
+                </Typography>
+
+                {incidentViewLoading && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                    <CircularProgress size={28} />
+                  </Box>
                 )}
 
-                {selectedIncident.resolutionNotes && (
-                  <>
-                    <Divider sx={{ my: 2 }} />
-                    <Typography variant="subtitle2" gutterBottom>
-                      Заметки по решению
-                    </Typography>
-                    <Paper sx={{ p: 2, bgcolor: 'success.50' }}>
-                      <Typography variant="body2">{selectedIncident.resolutionNotes}</Typography>
-                    </Paper>
-                  </>
+                {!incidentViewLoading && findingSlides.length === 0 && (
+                  <Alert severity="info">По этому инциденту не найдены findings.</Alert>
                 )}
 
-                {selectedIncident.falsePositiveReason && (
-                  <>
-                    <Divider sx={{ my: 2 }} />
-                    <Typography variant="subtitle2" gutterBottom>
-                      Причина ложного срабатывания
-                    </Typography>
-                    <Paper sx={{ p: 2, bgcolor: 'warning.50' }}>
-                      <Typography variant="body2">{selectedIncident.falsePositiveReason}</Typography>
-                    </Paper>
-                  </>
-                )}
-
-                {selectedIncident.payloadJson && (
-                  <>
-                    <Divider sx={{ my: 2 }} />
-                    <Accordion>
-                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                        <Typography variant="subtitle2">Исходные данные события</Typography>
-                      </AccordionSummary>
-                      <AccordionDetails>
-                        <Paper sx={{ p: 2, bgcolor: 'grey.100', maxHeight: 300, overflow: 'auto' }}>
-                          <pre style={{ margin: 0, fontSize: '0.85rem' }}>
-                            {JSON.stringify(selectedIncident.payloadJson, null, 2)}
-                          </pre>
-                        </Paper>
-                      </AccordionDetails>
-                    </Accordion>
-                  </>
-                )}
-
-                {similarIncidents.length > 0 && (
-                  <>
-                    <Divider sx={{ my: 2 }} />
-                    <Typography variant="subtitle2" gutterBottom>
-                      Похожие инциденты ({similarIncidents.length})
-                    </Typography>
-                    <Alert severity="info" sx={{ mb: 2 }}>
-                      Вы можете объединить похожие инциденты в один случай для комплексного расследования.
-                    </Alert>
-                    <List>
-                      {similarIncidents.slice(0, 5).map(similar => (
-                        <ListItem key={similar.id} sx={{ border: 1, borderColor: 'divider', borderRadius: 1, mb: 1 }}>
-                          <ListItemIcon>
-                            <WarningIcon color={getSeverityColor(similar.severity)} />
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={similar.title}
-                            secondary={
-                              <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-                                <Chip label={similar.id} size="small" />
-                                <Chip label={getStatusLabel(similar.status)} size="small" color={getStatusColor(similar.status)} />
+                {!incidentViewLoading && activeFindingSlide && (
+                  <Paper variant="outlined" sx={{ p: 2 }}>
+                    <Stack spacing={1.5}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body2" color="text.secondary">
+                          Сработало правило {activeFindingIndex + 1} из {findingSlides.length}
+                        </Typography>
+                        <Chip label={activeFindingSlide.findingId} size="small" variant="outlined" />
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">Название правила</Typography>
+                        <Typography variant="body2">{activeFindingSlide.rule?.name || '-'}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="text.secondary">Условие</Typography>
+                        <Typography variant="body2">{activeFindingSlide.rule?.condition || '-'}</Typography>
+                      </Box>
+                      <Grid container spacing={2}>
+                        <Grid size={{ xs: 6 }}>
+                          <Typography variant="caption" color="text.secondary">Приоритет</Typography>
+                          <Typography variant="body2">
+                            {getPriorityLabel(activeFindingSlide.rule?.priority)}
+                          </Typography>
+                        </Grid>
+                        <Grid size={{ xs: 6 }}>
+                          <Typography variant="caption" color="text.secondary">Ответственный</Typography>
+                          <Typography variant="body2">{activeFindingSlide.responsibleUserName}</Typography>
+                        </Grid>
+                      </Grid>
+                      {(activeFindingSlide.details.title ||
+                        activeFindingSlide.details.severity ||
+                        activeFindingSlide.details.description ||
+                        activeFindingSlide.details.recommendation) && (
+                        <Paper sx={{ p: 1.5, bgcolor: 'grey.50' }}>
+                          <Stack spacing={1}>
+                            {activeFindingSlide.details.title && (
+                              <Box>
+                                <Typography variant="caption" color="text.secondary">Заголовок</Typography>
+                                <Typography variant="body2">{activeFindingSlide.details.title}</Typography>
                               </Box>
-                            }
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </>
+                            )}
+                            {activeFindingSlide.details.severity && (
+                              <Box>
+                                <Typography variant="caption" color="text.secondary">Критичность риска</Typography>
+                                <Typography variant="body2">
+                                  {getSeverityLabel(activeFindingSlide.details.severity)}
+                                </Typography>
+                              </Box>
+                            )}
+                            {activeFindingSlide.details.description && (
+                              <Box>
+                                <Typography variant="caption" color="text.secondary">Описание</Typography>
+                                <Typography variant="body2">{activeFindingSlide.details.description}</Typography>
+                              </Box>
+                            )}
+                            {activeFindingSlide.details.recommendation && (
+                              <Box>
+                                <Typography variant="caption" color="text.secondary">Рекомендация</Typography>
+                                <Typography variant="body2">{activeFindingSlide.details.recommendation}</Typography>
+                              </Box>
+                            )}
+                          </Stack>
+                        </Paper>
+                      )}
+                    </Stack>
+                    {findingSlides.length > 1 && (
+                      <MobileStepper
+                        variant="dots"
+                        steps={findingSlides.length}
+                        position="static"
+                        activeStep={activeFindingIndex}
+                        sx={{ mt: 2, px: 0 }}
+                        nextButton={
+                          <Button
+                            size="small"
+                            onClick={() => setActiveFindingIndex((prev) => Math.min(prev + 1, findingSlides.length - 1))}
+                            disabled={activeFindingIndex >= findingSlides.length - 1}
+                          >
+                            <NavigateNextIcon />
+                          </Button>
+                        }
+                        backButton={
+                          <Button
+                            size="small"
+                            onClick={() => setActiveFindingIndex((prev) => Math.max(prev - 1, 0))}
+                            disabled={activeFindingIndex === 0}
+                          >
+                            <NavigateBeforeIcon />
+                          </Button>
+                        }
+                      />
+                    )}
+                  </Paper>
                 )}
               </DialogContent>
 

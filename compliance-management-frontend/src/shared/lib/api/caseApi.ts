@@ -11,14 +11,101 @@ import type {
   CaseStatistics,
   CaseVerificationDetails,
   VerificationDecision,
+  CaseViewItem,
 } from '@shared/types/caseTypes';
 
+interface MyCaseDto {
+  id?: unknown;
+  caseId?: unknown;
+  ruleId?: unknown;
+  ruleName?: unknown;
+  priority?: string;
+  status?: string;
+  deadline?: string | null;
+}
+
 export class CaseApi {
+  private static stringifyUnknown(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return '';
+  }
+
+  private static normalizeStatus(status: string | undefined): Case['status'] {
+    const normalized = (status || '').toUpperCase();
+    const statusMap: Record<string, Case['status']> = {
+      OPEN: 'OPEN',
+      ASSIGNED: 'ASSIGNED',
+      IN_PROGRESS: 'IN_PROGRESS',
+      INVESTIGATING: 'INVESTIGATING',
+      ACTION_PLAN: 'ACTION_PLAN',
+      ACTION_IN_PROGRESS: 'ACTION_IN_PROGRESS',
+      WAITING_VERIFICATION: 'WAITING_VERIFICATION',
+      CLOSED: 'CLOSED',
+      REJECTED: 'REJECTED',
+      ESCALATED_TO_CASE: 'ESCALATED_TO_CASE',
+    };
+    return statusMap[normalized] || 'OPEN';
+  }
+
+  private static normalizePriority(priority: string | undefined): Case['priority'] {
+    const normalized = (priority || '').toUpperCase();
+    const priorityMap: Record<string, Case['priority']> = {
+      LOW: 'LOW',
+      NORMAL: 'NORMAL',
+      MEDIUM: 'NORMAL',
+      HIGH: 'HIGH',
+      URGENT: 'URGENT',
+      CRITICAL: 'URGENT',
+    };
+    return priorityMap[normalized] || 'NORMAL';
+  }
+
+  private static normalizeMyCase(dto: MyCaseDto): Case {
+    const now = new Date().toISOString();
+    const caseId =
+      this.stringifyUnknown(dto.caseId) ||
+      this.stringifyUnknown(dto.id) ||
+      this.stringifyUnknown(dto.ruleId) ||
+      crypto.randomUUID();
+    const ruleId = this.stringifyUnknown(dto.ruleId) || caseId;
+    const ruleName = this.stringifyUnknown(dto.ruleName) || 'Без названия';
+    const normalizedStatus = this.normalizeStatus(dto.status);
+    const normalizedPriority = this.normalizePriority(dto.priority);
+
+    return {
+      id: caseId,
+      caseId,
+      ruleId,
+      title: ruleName,
+      description: '',
+      status: normalizedStatus,
+      severity: 'MEDIUM',
+      priority: normalizedPriority,
+      ownerId: '',
+      ownerName: '',
+      createdAt: now,
+      updatedAt: now,
+      dueDate: dto.deadline || undefined,
+      incidentIds: [],
+      tags: [],
+      requiresCorrectiveAction: false,
+    };
+  }
+
   /**
    * Получить все случаи текущего пользователя
    */
   static async getMyCases(): Promise<Case[]> {
-    const response = await apiClient.get<Case[]>('/cases/my');
+    const response = await apiClient.get<MyCaseDto[]>('/cases/my');
+    return response.data.map((item) => this.normalizeMyCase(item));
+  }
+
+  /**
+   * Получить данные для карточки просмотра случаев
+   */
+  static async getCaseView(caseId: string): Promise<CaseViewItem> {
+    const response = await apiClient.get<CaseViewItem>(`/cases/${caseId}/view`);
     return response.data;
   }
 
@@ -61,7 +148,7 @@ export class CaseApi {
     caseId: string,
     data: UpdateInvestigationRequest
   ): Promise<Case> {
-    const response = await apiClient.patch<Case>(`/cases/${caseId}/investigation`, data);
+    const response = await apiClient.patch<Case>(`/api/cases/${caseId}/investigation`, data);
     return response.data;
   }
 

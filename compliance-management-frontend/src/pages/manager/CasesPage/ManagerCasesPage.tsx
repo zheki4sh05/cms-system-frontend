@@ -57,6 +57,9 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { CaseApi } from '@shared/lib/api/caseApi';
 import { TaskApi } from '@shared/lib/api/taskApi';
+import { RuleApi } from '@shared/lib/api/ruleApi';
+import { IncidentApi } from '@shared/lib/api/incidentApi';
+import { useAuthStore } from '@features/auth/useAuthStore';
 import type {
   Case,
   CaseStatus,
@@ -65,6 +68,7 @@ import type {
   CaseComment,
   CaseAttachment,
   CaseStatistics,
+  CaseViewItem,
 } from '@shared/types/caseTypes';
 
 interface TabPanelProps {
@@ -84,6 +88,7 @@ function TabPanel(props: TabPanelProps) {
 
 export const ManagerCasesPage: FC = observer(() => {
   const navigate = useNavigate();
+  const authStore = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [cases, setCases] = useState<Case[]>([]);
   const [statistics, setStatistics] = useState<CaseStatistics | null>(null);
@@ -99,6 +104,8 @@ export const ManagerCasesPage: FC = observer(() => {
   const [investigationNotes, setInvestigationNotes] = useState('');
   const [rootCause, setRootCause] = useState('');
   const [requiresAction, setRequiresAction] = useState(false);
+  const [responsibleDisplayName, setResponsibleDisplayName] = useState<string>('-');
+  const [caseViewData, setCaseViewData] = useState<CaseViewItem | null>(null);
 
   useEffect(() => {
     loadCases();
@@ -107,14 +114,19 @@ export const ManagerCasesPage: FC = observer(() => {
   const loadCases = async () => {
     try {
       setLoading(true);
-      const [casesData, statsData] = await Promise.all([
-        CaseApi.getMyCases(),
-        CaseApi.getCaseStatistics(),
-      ]);
+      const casesData = await CaseApi.getMyCases();
       setCases(casesData);
-      setStatistics(statsData);
+
+      try {
+        const statsData = await CaseApi.getCaseStatistics();
+        setStatistics(statsData);
+      } catch (statsError) {
+        console.error('Failed to load case statistics:', statsError);
+        setStatistics(null);
+      }
     } catch (error) {
       console.error('Failed to load cases:', error);
+      setCases([]);
     } finally {
       setLoading(false);
     }
@@ -125,9 +137,27 @@ export const ManagerCasesPage: FC = observer(() => {
     setInvestigationNotes(caseItem.investigationNotes || '');
     setRootCause(caseItem.rootCause || '');
     setRequiresAction(caseItem.requiresCorrectiveAction);
+    setResponsibleDisplayName(caseItem.ownerName || '-');
+    setCaseViewData(null);
     setDialogOpen(true);
-    
-    // Загрузить комментарии и вложения
+
+    // 1) Сначала загрузить view карточки case
+    try {
+      const viewData = await CaseApi.getCaseView(caseItem.caseId || caseItem.id);
+      setCaseViewData(viewData);
+      setInvestigationNotes(viewData.investigationNotes || caseItem.investigationNotes || '');
+      setRootCause(viewData.rootCause || caseItem.rootCause || '');
+      setRequiresAction(
+        typeof viewData.requiresCorrectiveAction === 'boolean'
+          ? viewData.requiresCorrectiveAction
+          : caseItem.requiresCorrectiveAction
+      );
+    } catch (viewError) {
+      console.error('Failed to load cases view data:', viewError);
+      setCaseViewData(null);
+    }
+
+    // После view догружаем комментарии и вложения
     try {
       const [commentsData, attachmentsData] = await Promise.all([
         CaseApi.getCaseComments(caseItem.id),
@@ -138,6 +168,25 @@ export const ManagerCasesPage: FC = observer(() => {
     } catch (error) {
       console.error('Failed to load case details:', error);
     }
+
+    // Определить ответственного как в окне инцидента:
+    // rule -> responsibleUserId -> Вы/имя пользователя
+    try {
+      const rule = await RuleApi.getRuleShort(caseItem.ruleId || caseItem.id);
+      const responsibleUserId = rule.responsibleUserId;
+      if (responsibleUserId && responsibleUserId === authStore.user?.id) {
+        setResponsibleDisplayName('Вы');
+      } else if (responsibleUserId) {
+        const user = await IncidentApi.getUserBasicInfo(responsibleUserId);
+        const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+        setResponsibleDisplayName(user.fullName || fullName || user.email || responsibleUserId);
+      } else {
+        setResponsibleDisplayName('-');
+      }
+    } catch (responsibleError) {
+      console.error('Failed to load responsible user for case:', responsibleError);
+      setResponsibleDisplayName(caseItem.ownerName || '-');
+    }
   };
 
   const handleCloseDialog = () => {
@@ -147,6 +196,8 @@ export const ManagerCasesPage: FC = observer(() => {
     setComments([]);
     setAttachments([]);
     setNewComment('');
+    setResponsibleDisplayName('-');
+    setCaseViewData(null);
   };
 
   const handleAddComment = async () => {
@@ -177,7 +228,7 @@ export const ManagerCasesPage: FC = observer(() => {
     if (!selectedCase) return;
     
     try {
-      await CaseApi.updateInvestigation(selectedCase.id, {
+      await CaseApi.updateInvestigation(selectedCase.caseId || selectedCase.id, {
         investigationNotes,
         rootCause,
         requiresCorrectiveAction: requiresAction,
@@ -226,8 +277,9 @@ export const ManagerCasesPage: FC = observer(() => {
   const getStatusColor = (status: CaseStatus) => {
     switch (status) {
       case 'OPEN': return 'info';
+      case 'ASSIGNED': return 'primary';
       case 'IN_PROGRESS': return 'warning';
-      case 'INVESTIGATION': return 'primary';
+      case 'INVESTIGATING': return 'primary';
       case 'ACTION_PLAN': return 'warning';
       case 'ACTION_IN_PROGRESS': return 'info';
       case 'WAITING_VERIFICATION': return 'secondary';
@@ -239,8 +291,9 @@ export const ManagerCasesPage: FC = observer(() => {
   const getStatusLabel = (status: CaseStatus) => {
     const labels = {
       OPEN: 'Открыт',
+      ASSIGNED: 'Назначен ответственный',
       IN_PROGRESS: 'В работе',
-      INVESTIGATION: 'Расследование',
+      INVESTIGATING: 'Расследование',
       ACTION_PLAN: 'План действий',
       ACTION_IN_PROGRESS: 'План в работе',
       WAITING_VERIFICATION: 'На проверке',
@@ -250,6 +303,43 @@ export const ManagerCasesPage: FC = observer(() => {
     };
     return labels[status];
   };
+
+  const getPriorityLabel = (priority: CasePriority): string => {
+    const labels: Record<CasePriority, string> = {
+      LOW: 'Низкий',
+      NORMAL: 'Нормальный',
+      HIGH: 'Высокий',
+      URGENT: 'Срочный',
+    };
+    return labels[priority];
+  };
+
+  const stringifyValue = (value: unknown): string => {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (value && typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return '-';
+      }
+    }
+    return '-';
+  };
+
+  const getRiskSeverityLabel = (severity?: string): string => {
+    if (!severity) return '-';
+    const labels: Record<string, string> = {
+      LOW: 'Низкая',
+      MEDIUM: 'Средняя',
+      HIGH: 'Высокая',
+      CRITICAL: 'Критичная',
+    };
+    return labels[severity.toUpperCase()] || severity;
+  };
+
+  const isInvestigationEditable =
+    selectedCase?.status === 'INVESTIGATING' || selectedCase?.status === 'ASSIGNED';
 
   const filteredCases = cases.filter(c =>
     c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -362,7 +452,6 @@ export const ManagerCasesPage: FC = observer(() => {
               <TableRow>
                 <TableCell>ID</TableCell>
                 <TableCell>Название</TableCell>
-                <TableCell>Критичность</TableCell>
                 <TableCell>Приоритет</TableCell>
                 <TableCell>Статус</TableCell>
                 <TableCell>Срок</TableCell>
@@ -370,27 +459,17 @@ export const ManagerCasesPage: FC = observer(() => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredCases.map((caseItem) => (
+              {filteredCases.map((caseItem, index) => (
                 <TableRow key={caseItem.id} hover>
-                  <TableCell>{caseItem.id}</TableCell>
+                  <TableCell>{index + 1}</TableCell>
                   <TableCell>
                     <Typography variant="body2" fontWeight="medium">
                       {caseItem.title}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {caseItem.description.substring(0, 60)}...
-                    </Typography>
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={caseItem.severity}
-                      color={getSeverityColor(caseItem.severity)}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={caseItem.priority}
+                      label={getPriorityLabel(caseItem.priority)}
                       variant="outlined"
                       size="small"
                     />
@@ -403,7 +482,7 @@ export const ManagerCasesPage: FC = observer(() => {
                     />
                   </TableCell>
                   <TableCell>
-                    {caseItem.dueDate ? new Date(caseItem.dueDate).toLocaleDateString('ru-RU') : '-'}
+                    {caseItem.dueDate ? new Date(caseItem.dueDate).toLocaleDateString('ru-RU') : 'Не задано'}
                   </TableCell>
                   <TableCell align="right">
                     <Tooltip title="Открыть">
@@ -486,13 +565,77 @@ export const ManagerCasesPage: FC = observer(() => {
                     </Grid>
                     <Grid size={{xs: 6}}>
                       <Typography variant="caption" color="text.secondary">Ответственный</Typography>
-                      <Typography variant="body2">{selectedCase.ownerName}</Typography>
+                      <Typography variant="body2">{responsibleDisplayName}</Typography>
                     </Grid>
                     <Grid size={{xs: 6}}>
                       <Typography variant="caption" color="text.secondary">Связанные инциденты</Typography>
                       <Typography variant="body2">{selectedCase.incidentIds.length}</Typography>
                     </Grid>
                   </Grid>
+
+                  {caseViewData && (
+                    <>
+                      <Divider sx={{ my: 2 }} />
+                      <Typography variant="subtitle2" gutterBottom>
+                        Данные правила
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid size={{ xs: 6 }}>
+                          <Typography variant="caption" color="text.secondary">Название правила</Typography>
+                          <Typography variant="body2">{stringifyValue(caseViewData.ruleName)}</Typography>
+                        </Grid>
+                        <Grid size={{ xs: 6 }}>
+                          <Typography variant="caption" color="text.secondary">ID правила</Typography>
+                          <Typography variant="body2">{stringifyValue(caseViewData.ruleId)}</Typography>
+                        </Grid>
+                        <Grid size={{ xs: 12 }}>
+                          <Typography variant="caption" color="text.secondary">Условие правила</Typography>
+                          <Typography variant="body2">{stringifyValue(caseViewData.ruleCondition)}</Typography>
+                        </Grid>
+                        <Grid size={{ xs: 12 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Результаты выявления риска
+                          </Typography>
+                          <Paper sx={{ p: 1.5, bgcolor: 'grey.50' }}>
+                            <Grid container spacing={1.5}>
+                              <Grid size={{ xs: 12 }}>
+                                <Typography variant="caption" color="text.secondary">Заголовок</Typography>
+                                <Typography variant="body2">
+                                  {stringifyValue((caseViewData.details as Record<string, unknown> | undefined)?.title)}
+                                </Typography>
+                              </Grid>
+                              <Grid size={{ xs: 12 }}>
+                                <Typography variant="caption" color="text.secondary">Критичность риска</Typography>
+                                <Typography variant="body2">
+                                  {getRiskSeverityLabel(
+                                    stringifyValue(
+                                      (caseViewData.details as Record<string, unknown> | undefined)?.severity
+                                    )
+                                  )}
+                                </Typography>
+                              </Grid>
+                              <Grid size={{ xs: 12 }}>
+                                <Typography variant="caption" color="text.secondary">Описание</Typography>
+                                <Typography variant="body2">
+                                  {stringifyValue(
+                                    (caseViewData.details as Record<string, unknown> | undefined)?.description
+                                  )}
+                                </Typography>
+                              </Grid>
+                              <Grid size={{ xs: 12 }}>
+                                <Typography variant="caption" color="text.secondary">Рекомендация</Typography>
+                                <Typography variant="body2">
+                                  {stringifyValue(
+                                    (caseViewData.details as Record<string, unknown> | undefined)?.recommendation
+                                  )}
+                                </Typography>
+                              </Grid>
+                            </Grid>
+                          </Paper>
+                        </Grid>
+                      </Grid>
+                    </>
+                  )}
                   {selectedCase.tags.length > 0 && (
                     <>
                       <Divider sx={{ my: 2 }} />
@@ -508,6 +651,21 @@ export const ManagerCasesPage: FC = observer(() => {
 
                 {/* Вкладка "Расследование" */}
                 <TabPanel value={tabValue} index={1}>
+                  {!isInvestigationEditable && (
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                      Редактирование расследования доступно только для случаев в статусе ASSIGNED или INVESTIGATING.
+                    </Alert>
+                  )}
+
+                  {caseViewData?.updatedAt && (
+                    <Paper sx={{ p: 2, mb: 2, bgcolor: 'grey.50' }}>
+                      <Typography variant="caption" color="text.secondary">Обновлено</Typography>
+                      <Typography variant="body2">
+                        {new Date(caseViewData.updatedAt).toLocaleString('ru-RU')}
+                      </Typography>
+                    </Paper>
+                  )}
+
                   <Alert severity="info" sx={{ mb: 3 }}>
                     <Typography variant="body2">
                       Проведите расследование случая, определите первопричину и решите, требуются ли корректирующие действия.
@@ -523,6 +681,7 @@ export const ManagerCasesPage: FC = observer(() => {
                     onChange={(e) => setInvestigationNotes(e.target.value)}
                     placeholder="Опишите ход расследования, найденные факты и промежуточные выводы..."
                     sx={{ mb: 3 }}
+                    disabled={!isInvestigationEditable}
                   />
 
                   <TextField
@@ -534,6 +693,7 @@ export const ManagerCasesPage: FC = observer(() => {
                     onChange={(e) => setRootCause(e.target.value)}
                     placeholder="Укажите выявленную первопричину нарушения..."
                     sx={{ mb: 3 }}
+                    disabled={!isInvestigationEditable}
                   />
 
                   <FormControl fullWidth sx={{ mb: 3 }}>
@@ -542,6 +702,7 @@ export const ManagerCasesPage: FC = observer(() => {
                       value={requiresAction ? 'yes' : 'no'}
                       onChange={(e) => setRequiresAction(e.target.value === 'yes')}
                       label="Требуются корректирующие действия?"
+                    disabled={!isInvestigationEditable}
                     >
                       <MenuItem value="no">Нет, закрыть случай</MenuItem>
                       <MenuItem value="yes">Да, создать план действий</MenuItem>
@@ -653,9 +814,11 @@ export const ManagerCasesPage: FC = observer(() => {
                   Отмена
                 </Button>
                 <Button
-                  variant="outlined"
+                  variant="contained"
+                  color="success"
                   onClick={handleSaveInvestigation}
                   startIcon={<CheckIcon />}
+                  disabled={!isInvestigationEditable || !investigationNotes.trim() || !rootCause.trim()}
                 >
                   Сохранить расследование
                 </Button>
@@ -669,10 +832,10 @@ export const ManagerCasesPage: FC = observer(() => {
                   </Button>
                 ) : (
                   <Button
-                    variant="contained"
-                    color="success"
+                    variant="outlined"
+                    color="error"
                     onClick={handleCloseCase}
-                    startIcon={<CheckIcon />}
+                    startIcon={<CloseIcon />}
                   >
                     Закрыть случай
                   </Button>

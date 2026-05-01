@@ -44,7 +44,7 @@ const incidentStatusLabel: Record<string, string> = {
 const caseStatusLabel: Record<string, string> = {
   OPEN: 'Открыт',
   IN_PROGRESS: 'В работе',
-  INVESTIGATION: 'Расследование',
+  INVESTIGATING: 'Расследование',
   ACTION_PLAN: 'План действий',
   ACTION_IN_PROGRESS: 'Выполнение плана',
   WAITING_VERIFICATION: 'Ожидает проверки',

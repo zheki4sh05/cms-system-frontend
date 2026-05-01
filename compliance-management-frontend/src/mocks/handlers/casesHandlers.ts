@@ -199,7 +199,7 @@ let mockCases: Case[] = [
     id: 'CS-2024-001',
     title: 'Превышение бюджета закупки на 23%',
     description: 'Обнаружено превышение утвержденного бюджета при закупке офисной техники. Сумма превышения составляет 450 000 руб.',
-    status: 'INVESTIGATION' as CaseStatus,
+    status: 'INVESTIGATING' as CaseStatus,
     severity: 'HIGH' as CaseSeverity,
     priority: 'HIGH' as CasePriority,
     ownerId: '1',
@@ -367,7 +367,7 @@ export const casesHandlers = [
       inProgress: mockCases.filter(c => c.status === 'IN_PROGRESS').length,
       investigation: mockCases.filter(
         c =>
-          c.status === 'INVESTIGATION'
+          c.status === 'INVESTIGATING'
           || c.status === 'ACTION_PLAN'
           || c.status === 'ACTION_IN_PROGRESS'
       ).length,
@@ -470,7 +470,7 @@ export const casesHandlers = [
       investigationNotes: body.investigationNotes,
       rootCause: body.rootCause,
       requiresCorrectiveAction: body.requiresCorrectiveAction,
-      status: CaseStatus.INVESTIGATION,
+      status: CaseStatus.INVESTIGATING,
       updatedAt: new Date().toISOString(),
     };
 

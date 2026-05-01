@@ -1,6 +1,17 @@
 import { apiClient } from './apiClient';
 import type { AuthResponse, LoginCredentials, RegisterCredentials } from '@shared/types/customTypes';
 
+export interface UserMeResponse {
+  id: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  email: string;
+  role: string;
+  companyId?: string;
+  employeeId?: string;
+}
+
 export class AuthApi {
   static async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const response = await apiClient.post<AuthResponse>('/auth/login', credentials);
@@ -22,6 +33,12 @@ export class AuthApi {
     const response = await apiClient.get<AuthResponse['user']>('/auth/me');
     return response.data;
   }
+
+  static async getUserMe(): Promise<UserMeResponse> {
+    const response = await apiClient.get<UserMeResponse>('/api/users/me');
+    return response.data;
+  }
+
    static async register(credentials: RegisterCredentials): Promise<AuthResponse> {
     const response = await apiClient.post<AuthResponse>('/auth/register', credentials);
     return response.data;

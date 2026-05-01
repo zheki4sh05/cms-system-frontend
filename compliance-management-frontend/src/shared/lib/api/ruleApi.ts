@@ -12,8 +12,23 @@ import type {
   ValidateScriptRequest,
   ValidateScriptResponse,
 } from '@shared/types/rulesTypes';
+import type { RuleShortInfo } from '@shared/types/incidentTypes';
 
 export class RuleApi {
+  private static getCompanyIdForHeader(): string | undefined {
+    try {
+      const rawUser = localStorage.getItem('user');
+      if (!rawUser) {
+        return undefined;
+      }
+
+      const user = JSON.parse(rawUser) as { companyId?: string };
+      return user.companyId;
+    } catch {
+      return undefined;
+    }
+  }
+
   /**
    * Получить все правила
    */
@@ -35,6 +50,17 @@ export class RuleApi {
    */
   static async getRuleById(ruleId: string): Promise<Rule> {
     const response = await apiClient.get<Rule>(`/rules/${ruleId}`);
+    return response.data;
+  }
+
+  /**
+   * Получить короткую информацию о правиле
+   */
+  static async getRuleShort(ruleId: string): Promise<RuleShortInfo> {
+    const companyId = this.getCompanyIdForHeader();
+    const response = await apiClient.get<RuleShortInfo>(`/api/rules/short/${ruleId}`, {
+      headers: companyId ? { CompanyId: companyId } : undefined,
+    });
     return response.data;
   }
 

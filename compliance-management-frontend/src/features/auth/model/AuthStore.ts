@@ -58,20 +58,39 @@ export class AuthStore {
     try {
       const response = await AuthApi.login(credentials);
 
+      // Сохраняем токены до запросов к защищенным endpoint'ам
+      localStorage.setItem('accessToken', response.tokens.accessToken);
+      localStorage.setItem('refreshToken', response.tokens.refreshToken);
+
+      let userData = response.user;
+
+      try {
+        const profile = await AuthApi.getUserMe();
+        userData = {
+          ...userData,
+          firstName: profile.firstName || userData.firstName,
+          lastName: profile.lastName || userData.lastName,
+          email: profile.email || userData.email,
+          role: profile.role as User['role'],
+          companyId: profile.companyId || userData.companyId,
+          employeeId: profile.employeeId || userData.employeeId,
+        };
+      } catch (profileError) {
+        console.error('Failed to load /api/users/me profile:', profileError);
+      }
+
       runInAction(() => {
-        this.user = response.user;
+        this.user = userData;
         this.isAuthenticated = true;
         this.isLoading = false;
 
         // Если это НЕ первый вход - показываем профиль
-        this.shouldShowProfile = !response.user.isFirstLogin;
-        // Сохранение токенов и данных пользователя
-        localStorage.setItem('accessToken', response.tokens.accessToken);
-        localStorage.setItem('refreshToken', response.tokens.refreshToken);
-        localStorage.setItem('user', JSON.stringify(response.user));
+        this.shouldShowProfile = !userData.isFirstLogin;
+        // Сохранение данных пользователя
+        localStorage.setItem('user', JSON.stringify(userData));
       });
 
-      return response.user;
+      return userData;
     } catch (error: any) {
       runInAction(() => {
         this.error = error.response?.data?.message || 'Ошибка входа в систему';

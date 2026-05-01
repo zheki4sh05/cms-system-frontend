@@ -2,8 +2,9 @@
 
 export enum CaseStatus {
   OPEN = 'OPEN',
+  ASSIGNED = 'ASSIGNED',
   IN_PROGRESS = 'IN_PROGRESS',
-  INVESTIGATION = 'INVESTIGATION',
+  INVESTIGATING = 'INVESTIGATING',
   ACTION_PLAN = 'ACTION_PLAN',
   ACTION_IN_PROGRESS = 'ACTION_IN_PROGRESS',
   WAITING_VERIFICATION = 'WAITING_VERIFICATION',
@@ -28,6 +29,8 @@ export enum CasePriority {
 
 export interface Case {
   id: string;
+  caseId?: string;
+  ruleId?: string;
   title: string;
   description: string;
   status: CaseStatus;
@@ -150,4 +153,15 @@ export interface CaseVerificationDetails {
   verificationStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
   verifiedBy?: string;
   verifiedAt?: string;
+}
+
+export interface CaseViewItem {
+  ruleId?: unknown;
+  ruleName?: unknown;
+  ruleCondition?: unknown;
+  details?: Record<string, unknown>;
+  investigationNotes?: string;
+  rootCause?: string;
+  requiresCorrectiveAction?: boolean;
+  updatedAt?: string;
 }

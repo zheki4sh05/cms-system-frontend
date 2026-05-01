@@ -12,6 +12,9 @@ import type {
   ReassignIncidentRequest,
   EscalateIncidentRequest,
   IncidentAssignment,
+  IncidentViewDto,
+  UserBasicInfo,
+  AssignToMeResponse,
 } from '@shared/types/incidentTypes';
 import type { Case } from '@shared/types/caseTypes';
 
@@ -155,8 +158,8 @@ export class IncidentApi {
   /**
    * Взять инцидент в работу
    */
-  static async assignToMe(incidentId: string): Promise<Incident> {
-    const response = await apiClient.post<Incident>(`/incidents/${incidentId}/assign-to-me`);
+  static async assignToMe(incidentId: string): Promise<AssignToMeResponse> {
+    const response = await apiClient.post<AssignToMeResponse>(`/api/incidents/${incidentId}/assign-to-me`);
     return response.data;
   }
 
@@ -165,6 +168,22 @@ export class IncidentApi {
    */
   static async getSimilarIncidents(incidentId: string): Promise<Incident[]> {
     const response = await apiClient.get<Incident[]>(`/incidents/${incidentId}/similar`);
+    return response.data;
+  }
+
+  /**
+   * Получить детальный просмотр инцидента (view DTO)
+   */
+  static async getIncidentView(incidentId: string): Promise<IncidentViewDto> {
+    const response = await apiClient.get<IncidentViewDto>(`/api/incidents/${incidentId}/view`);
+    return response.data;
+  }
+
+  /**
+   * Получить базовую информацию о пользователе из user-service
+   */
+  static async getUserBasicInfo(userId: string): Promise<UserBasicInfo> {
+    const response = await apiClient.get<UserBasicInfo>(`http://localhost:8081/api/users/${userId}/basic-info`);
     return response.data;
   }
 
