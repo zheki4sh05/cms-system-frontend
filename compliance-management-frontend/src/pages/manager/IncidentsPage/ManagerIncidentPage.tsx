@@ -86,6 +86,15 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+/** Кнопка assign-to-me для PARTLY_PROGRESS, если текущий пользователь ещё не в employees. */
+function shouldShowAssignToMeForPartlyProgress(incident: Incident, currentUserId?: string): boolean {
+  if (incident.status !== 'PARTLY_PROGRESS') return false;
+  if (!currentUserId) return false;
+  const employees = incident.employees;
+  if (!employees?.length) return true;
+  return !employees.some((e) => e.userId === currentUserId);
+}
+
 export const ManagerIncidentsPage: FC = observer(() => {
   const navigate = useNavigate();
   const authStore = useAuthStore();
@@ -355,13 +364,16 @@ export const ManagerIncidentsPage: FC = observer(() => {
   const handleAssignToMe = async (incidentId: string) => {
     try {
       const assignResult = await IncidentApi.assignToMe(incidentId);
-      const targetIncidentId = assignResult.incidentId || incidentId;
-      const normalized = assignResult.status.toUpperCase();
+      const targetIncidentId = assignResult.incidentId || assignResult.id || incidentId;
+      const rawStatus = assignResult.status;
+      const normalized =
+        typeof rawStatus === 'string' ? rawStatus.toUpperCase() : 'ASSIGNED';
       const statusMap: Record<string, IncidentStatus> = {
         NEW: 'NEW',
         OPEN: 'NEW',
         ASSIGNED: 'ASSIGNED',
-        PARTLY_PROGRESS: 'ASSIGNED',
+        PARTLY_PROGRESS: 'PARTLY_PROGRESS',
+        PARTLY_PROGGRESS: 'PARTLY_PROGRESS',
         IN_PROGRESS: 'IN_REVIEW',
         IN_REVIEW: 'IN_REVIEW',
         RESOLVED: 'RESOLVED',
@@ -370,17 +382,34 @@ export const ManagerIncidentsPage: FC = observer(() => {
         ESCALATED_TO_CASE: 'ESCALATED_TO_CASE',
       };
       const nextStatus = statusMap[normalized] || 'NEW';
+      const uid = authStore.user?.id;
+      const mergeSelfEmployees = (inc: Incident): Incident['employees'] => {
+        if (!uid) return inc.employees;
+        const list = [...(inc.employees ?? [])];
+        if (!list.some((e) => e.userId === uid)) list.push({ userId: uid });
+        return list;
+      };
 
       setIncidents((prev) =>
         prev.map((incident) =>
           incident.id === targetIncidentId
-            ? { ...incident, status: nextStatus, assignedTo: authStore.user?.id || incident.assignedTo }
+            ? {
+                ...incident,
+                status: nextStatus,
+                assignedTo: uid || incident.assignedTo,
+                employees: mergeSelfEmployees(incident),
+              }
             : incident
         )
       );
       setSelectedIncident((prev) =>
         prev && prev.id === targetIncidentId
-          ? { ...prev, status: nextStatus, assignedTo: authStore.user?.id || prev.assignedTo }
+          ? {
+              ...prev,
+              status: nextStatus,
+              assignedTo: uid || prev.assignedTo,
+              employees: mergeSelfEmployees(prev),
+            }
           : prev
       );
 
@@ -404,6 +433,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
     switch (status) {
       case 'NEW': return 'error';
       case 'ASSIGNED': return 'warning';
+      case 'PARTLY_PROGRESS': return 'warning';
       case 'IN_REVIEW': return 'info';
       case 'RESOLVED': return 'success';
       case 'FALSE_POSITIVE': return 'default';
@@ -412,9 +442,10 @@ export const ManagerIncidentsPage: FC = observer(() => {
   };
 
   const getStatusLabel = (status: IncidentStatus) => {
-    const labels = {
+    const labels: Record<IncidentStatus, string> = {
       NEW: 'Новый',
       ASSIGNED: 'Начатые',
+      PARTLY_PROGRESS: 'Частичный прогресс',
       IN_REVIEW: 'В работе',
       RESOLVED: 'Решен',
       FALSE_POSITIVE: 'Ложное срабатывание',
@@ -499,7 +530,9 @@ export const ManagerIncidentsPage: FC = observer(() => {
   });
 
   const newIncidents = filteredIncidents.filter(i => i.status === 'NEW');
-  const startedIncidents = filteredIncidents.filter(i => i.status === 'ASSIGNED');
+  const startedIncidents = filteredIncidents.filter(
+    i => i.status === 'ASSIGNED' || i.status === 'PARTLY_PROGRESS'
+  );
   const inProgressIncidents = filteredIncidents.filter(i => i.status === 'IN_REVIEW');
   const resolvedIncidents = filteredIncidents.filter(i => 
     i.status === 'RESOLVED' || i.status === 'FALSE_POSITIVE' || i.status === 'ESCALATED_TO_CASE'
@@ -1264,7 +1297,8 @@ export const ManagerIncidentsPage: FC = observer(() => {
                 <Button onClick={handleCloseViewDialog}>
                   Закрыть
                 </Button>
-                {selectedIncident.status === 'NEW' && (
+                {(selectedIncident.status === 'NEW' ||
+                  shouldShowAssignToMeForPartlyProgress(selectedIncident, authStore.user?.id)) && (
                   <Button
                     variant="outlined"
                     onClick={() => handleAssignToMe(selectedIncident.id)}
@@ -1273,7 +1307,11 @@ export const ManagerIncidentsPage: FC = observer(() => {
                     Взять в работу
                   </Button>
                 )}
-                {(selectedIncident.status === 'ASSIGNED' || selectedIncident.status === 'IN_REVIEW') && (
+                {(selectedIncident.status === 'ASSIGNED' ||
+                  selectedIncident.status === 'IN_REVIEW' ||
+                  (selectedIncident.status === 'PARTLY_PROGRESS' &&
+                    !!authStore.user?.id &&
+                    (selectedIncident.employees ?? []).some((e) => e.userId === authStore.user.id))) && (
                   <Button
                     variant="contained"
                     onClick={() => {

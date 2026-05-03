@@ -18,6 +18,7 @@ import {
 import type { Case, CaseStatus } from '@shared/types/caseTypes';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+const API_ROOT = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
 
 // Моковые данные инцидентов
 let mockIncidents: Incident[] = [
@@ -107,6 +108,33 @@ let mockIncidents: Incident[] = [
       expiryDate: '2024-11-15',
       currentDate: '2024-12-01',
       contractAmount: 320000,
+    },
+  },
+  {
+    id: 'INC-2024-PARTLY-1',
+    title: 'Совместная проверка контрагента (частичный прогресс)',
+    description:
+      'Другой исполнитель уже взял инцидент в работу; текущий пользователь может присоединиться через «Взять в работу».',
+    status: 'PARTLY_PROGRESS' as IncidentStatus,
+    severity: 'MEDIUM' as IncidentSeverity,
+    category: 'VENDOR' as IncidentCategory,
+    ruleId: 'RULE-005',
+    ruleName: 'Проверка контрагента',
+    ruleExpression: 'when vendor.kyc.pending then raise_incident(MEDIUM)',
+    assignedTo: '2',
+    assignedToName: 'Петр Петров',
+    employees: [{ userId: '2' }],
+    detectedAt: '2024-12-03T10:00:00Z',
+    createdAt: '2024-12-03T10:00:00Z',
+    updatedAt: '2024-12-03T10:00:00Z',
+    sourceSystem: 'KYC',
+    sourceEventId: 'EVT-PARTLY-1',
+    vendorId: 'VENDOR-999',
+    vendorName: 'ООО "Тест"',
+    amount: 0,
+    payloadJson: {
+      vendorId: 'VENDOR-999',
+      note: 'Демо PARTLY_PROGRESS для кнопки assign-to-me',
     },
   },
   {
@@ -408,6 +436,95 @@ const mockAssignmentHistory: Record<string, IncidentAssignment[]> = {
 // Моковые случаи (для эскалации)
 export let mockCases: Case[] = [];
 
+const MOCK_CURRENT_USER_ID = '1';
+
+async function handleGetMyIncidents({ request }: { request: Request }) {
+  await delay(400);
+  console.log('🚨 [MSW] Fetching my incidents');
+
+  const url = new URL(request.url);
+  const status = url.searchParams.get('status')?.split(',');
+  const severity = url.searchParams.get('severity')?.split(',');
+  const category = url.searchParams.get('category')?.split(',');
+  const dateFrom = url.searchParams.get('dateFrom');
+  const dateTo = url.searchParams.get('dateTo');
+  const searchQuery = url.searchParams.get('q');
+
+  let filtered = [...mockIncidents];
+
+  if (status && status.length > 0) {
+    filtered = filtered.filter(i => status.includes(i.status));
+  }
+
+  if (severity && severity.length > 0) {
+    filtered = filtered.filter(i => severity.includes(i.severity));
+  }
+
+  if (category && category.length > 0) {
+    filtered = filtered.filter(i => category.includes(i.category));
+  }
+
+  if (dateFrom) {
+    filtered = filtered.filter(i => new Date(i.detectedAt) >= new Date(dateFrom));
+  }
+  if (dateTo) {
+    filtered = filtered.filter(i => new Date(i.detectedAt) <= new Date(dateTo));
+  }
+
+  if (searchQuery) {
+    const query = searchQuery.toLowerCase();
+    filtered = filtered.filter(i =>
+      i.title.toLowerCase().includes(query) ||
+      i.description.toLowerCase().includes(query) ||
+      i.id.toLowerCase().includes(query) ||
+      i.ruleName.toLowerCase().includes(query)
+    );
+  }
+
+  return HttpResponse.json(filtered);
+}
+
+async function handleAssignIncidentToMe({ params }: { params: { incidentId: string } }) {
+  await delay(300);
+  const incidentId = String(params.incidentId);
+  console.log(`👤 [MSW] Assigning incident ${incidentId} to me`);
+
+  const index = mockIncidents.findIndex(i => i.id === incidentId);
+
+  if (index === -1) {
+    return HttpResponse.json(
+      { message: 'Инцидент не найден', code: 'INCIDENT_NOT_FOUND' },
+      { status: 404 }
+    );
+  }
+
+  const cur = mockIncidents[index];
+  const employees = [...(cur.employees ?? [])];
+  if (!employees.some((e) => e.userId === MOCK_CURRENT_USER_ID)) {
+    employees.push({ userId: MOCK_CURRENT_USER_ID });
+  }
+
+  const nextStatus: IncidentStatus =
+    cur.status === 'PARTLY_PROGRESS' ? 'PARTLY_PROGRESS' : 'ASSIGNED';
+
+  mockIncidents[index] = {
+    ...cur,
+    status: nextStatus,
+    employees,
+    assignedTo: MOCK_CURRENT_USER_ID,
+    assignedToName: 'Иван Иванов',
+    updatedAt: new Date().toISOString(),
+  };
+
+  const updated = mockIncidents[index];
+  return HttpResponse.json({
+    ...updated,
+    incidentId: updated.id,
+    findingId: 'mock-finding',
+    status: updated.status,
+  });
+}
+
 export const incidentsHandlers = [
 
   // GET /incidents/managers-workload - Получить нагрузку менеджеров
@@ -566,57 +683,9 @@ export const incidentsHandlers = [
     return HttpResponse.json(history);
   }),
 
-  // GET /incidents/my - Получить мои инциденты
-  http.get(`${API_BASE_URL}/incidents/my`, async ({ request }) => {
-    await delay(400);
-    console.log('🚨 [MSW] Fetching my incidents');
-    
-    const url = new URL(request.url);
-    const status = url.searchParams.get('status')?.split(',');
-    const severity = url.searchParams.get('severity')?.split(',');
-    const category = url.searchParams.get('category')?.split(',');
-    const dateFrom = url.searchParams.get('dateFrom');
-    const dateTo = url.searchParams.get('dateTo');
-    const searchQuery = url.searchParams.get('q');
-    
-    let filtered = [...mockIncidents];
-    
-    // Фильтрация по статусу
-    if (status && status.length > 0) {
-      filtered = filtered.filter(i => status.includes(i.status));
-    }
-    
-    // Фильтрация по критичности
-    if (severity && severity.length > 0) {
-      filtered = filtered.filter(i => severity.includes(i.severity));
-    }
-    
-    // Фильтрация по категории
-    if (category && category.length > 0) {
-      filtered = filtered.filter(i => category.includes(i.category));
-    }
-    
-    // Фильтрация по дате
-    if (dateFrom) {
-      filtered = filtered.filter(i => new Date(i.detectedAt) >= new Date(dateFrom));
-    }
-    if (dateTo) {
-      filtered = filtered.filter(i => new Date(i.detectedAt) <= new Date(dateTo));
-    }
-    
-    // Поиск
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(i =>
-        i.title.toLowerCase().includes(query) ||
-        i.description.toLowerCase().includes(query) ||
-        i.id.toLowerCase().includes(query) ||
-        i.ruleName.toLowerCase().includes(query)
-      );
-    }
-    
-    return HttpResponse.json(filtered);
-  }),
+  // GET /incidents/my и GET /api/incidents/my — мои инциденты
+  http.get(`${API_BASE_URL}/incidents/my`, handleGetMyIncidents),
+  http.get(`${API_ROOT}/api/incidents/my`, handleGetMyIncidents),
 
   // GET /incidents/statistics - Статистика по инцидентам
   http.get(`${API_BASE_URL}/incidents/statistics`, async () => {
@@ -626,7 +695,9 @@ export const incidentsHandlers = [
     const statistics: IncidentStatistics = {
       total: mockIncidents.length,
       new: mockIncidents.filter(i => i.status === 'NEW').length,
-      assigned: mockIncidents.filter(i => i.status === 'ASSIGNED').length,
+      assigned: mockIncidents.filter(
+        i => i.status === 'ASSIGNED' || i.status === 'PARTLY_PROGRESS'
+      ).length,
       inReview: mockIncidents.filter(i => i.status === 'IN_REVIEW').length,
       resolved: mockIncidents.filter(i => i.status === 'RESOLVED').length,
       falsePositive: mockIncidents.filter(i => i.status === 'FALSE_POSITIVE').length,
@@ -750,31 +821,9 @@ export const incidentsHandlers = [
     return HttpResponse.json(newCase, { status: 201 });
   }),
 
-  // POST /incidents/:incidentId/assign-to-me - Взять инцидент в работу
-  http.post(`${API_BASE_URL}/incidents/:incidentId/assign-to-me`, async ({ params }) => {
-    await delay(300);
-    const { incidentId } = params;
-    console.log(`👤 [MSW] Assigning incident ${incidentId} to me`);
-    
-    const index = mockIncidents.findIndex(i => i.id === incidentId);
-    
-    if (index === -1) {
-      return HttpResponse.json(
-        { message: 'Инцидент не найден', code: 'INCIDENT_NOT_FOUND' },
-        { status: 404 }
-      );
-    }
-    
-    mockIncidents[index] = {
-      ...mockIncidents[index],
-      status: 'ASSIGNED' as IncidentStatus,
-      assignedTo: '1',
-      assignedToName: 'Иван Иванов',
-      updatedAt: new Date().toISOString(),
-    };
-    
-    return HttpResponse.json(mockIncidents[index]);
-  }),
+  // POST …/assign-to-me — v1 и /api (как в IncidentApi.assignToMe)
+  http.post(`${API_BASE_URL}/incidents/:incidentId/assign-to-me`, handleAssignIncidentToMe),
+  http.post(`${API_ROOT}/api/incidents/:incidentId/assign-to-me`, handleAssignIncidentToMe),
 
   // GET /incidents/:incidentId/similar - Получить похожие инциденты
   http.get(`${API_BASE_URL}/incidents/:incidentId/similar`, async ({ params }) => {

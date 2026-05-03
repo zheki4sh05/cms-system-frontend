@@ -21,12 +21,14 @@ import type { Case } from '@shared/types/caseTypes';
 export class IncidentApi {
   private static normalizeStatus(status: unknown): Incident['status'] {
     if (typeof status !== 'string') return 'NEW';
-    const normalized = status.toUpperCase();
+    const upper = status.toUpperCase();
+    const normalized =
+      upper === 'PARTLY_PROGGRESS' || upper === 'PARTLY_PROGRESS' ? 'PARTLY_PROGRESS' : upper;
     const statusMap: Record<string, Incident['status']> = {
       NEW: 'NEW',
       OPEN: 'NEW',
       ASSIGNED: 'ASSIGNED',
-      PARTLY_PROGRESS: 'ASSIGNED',
+      PARTLY_PROGRESS: 'PARTLY_PROGRESS',
       IN_PROGRESS: 'IN_REVIEW',
       IN_REVIEW: 'IN_REVIEW',
       RESOLVED: 'RESOLVED',
@@ -61,6 +63,23 @@ export class IncidentApi {
         ? incident.detectedAt
         : new Date().toISOString();
 
+    const rawEmployees = incident.employees;
+    const employees: Incident['employees'] = Array.isArray(rawEmployees)
+      ? rawEmployees
+          .map((e) => {
+            if (e && typeof e === 'object' && 'userId' in e) {
+              const uid = (e as { userId: unknown }).userId;
+              return typeof uid === 'string' ? { userId: uid } : null;
+            }
+            if (e && typeof e === 'object' && 'id' in e) {
+              const uid = (e as { id: unknown }).id;
+              return typeof uid === 'string' ? { userId: uid } : null;
+            }
+            return null;
+          })
+          .filter((e): e is { userId: string } => e !== null)
+      : undefined;
+
     return {
       id: incident.id || '',
       riskObjectId: incident.riskObjectId,
@@ -78,6 +97,7 @@ export class IncidentApi {
       ruleExpression: incident.ruleExpression,
       assignedTo: incident.assignedTo || '',
       assignedToName: incident.assignedToName || '',
+      employees: employees?.length ? employees : undefined,
       detectedAt,
       createdAt: incident.createdAt || detectedAt,
       updatedAt: incident.updatedAt || detectedAt,
@@ -111,7 +131,7 @@ export class IncidentApi {
       if (filter.searchQuery) params.append('q', filter.searchQuery);
     }
     
-    const response = await apiClient.get<Partial<Incident>[]>(`/incidents/my?${params.toString()}`);
+    const response = await apiClient.get<Partial<Incident>[]>(`/api/incidents/my?${params.toString()}`);
     return response.data.map((incident) => this.normalizeIncident(incident));
   }
 

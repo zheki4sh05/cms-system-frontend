@@ -254,6 +254,7 @@ export const SupervisorIncidentsPage: FC = observer(() => {
     switch (status) {
       case 'NEW': return 'error';
       case 'ASSIGNED': return 'warning';
+      case 'PARTLY_PROGRESS': return 'warning';
       case 'IN_REVIEW': return 'info';
       case 'RESOLVED': return 'success';
       case 'FALSE_POSITIVE': return 'default';
@@ -262,9 +263,10 @@ export const SupervisorIncidentsPage: FC = observer(() => {
   };
 
   const getStatusLabel = (status: IncidentStatus) => {
-    const labels = {
+    const labels: Record<IncidentStatus, string> = {
       NEW: 'Новый',
       ASSIGNED: 'Назначен',
+      PARTLY_PROGRESS: 'Частичный прогресс',
       IN_REVIEW: 'На проверке',
       RESOLVED: 'Решен',
       FALSE_POSITIVE: 'Ложное срабатывание',
@@ -330,7 +332,12 @@ export const SupervisorIncidentsPage: FC = observer(() => {
   });
 
   const criticalIncidents = filteredIncidents.filter(i => i.severity === 'CRITICAL' && i.status === 'NEW');
-  const activeIncidents = filteredIncidents.filter(i => i.status === 'ASSIGNED' || i.status === 'IN_REVIEW');
+  const activeIncidents = filteredIncidents.filter(
+    i =>
+      i.status === 'ASSIGNED' ||
+      i.status === 'PARTLY_PROGRESS' ||
+      i.status === 'IN_REVIEW'
+  );
   const allIncidents = filteredIncidents;
 
   if (loading) {

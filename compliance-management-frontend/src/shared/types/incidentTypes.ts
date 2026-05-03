@@ -63,6 +63,7 @@ export interface IncidentDistribution {
 export enum IncidentStatus {
   NEW = 'NEW',
   ASSIGNED = 'ASSIGNED',
+  PARTLY_PROGRESS = 'PARTLY_PROGRESS',
   IN_REVIEW = 'IN_REVIEW',
   RESOLVED = 'RESOLVED',
   FALSE_POSITIVE = 'FALSE_POSITIVE',
@@ -106,6 +107,8 @@ export interface Incident {
   // Назначение
   assignedTo: string;
   assignedToName: string;
+  /** Участники (userId), приходит с GET /api/incidents/my */
+  employees?: Array<{ userId: string }>;
   
   // Временные метки
   detectedAt: string;
