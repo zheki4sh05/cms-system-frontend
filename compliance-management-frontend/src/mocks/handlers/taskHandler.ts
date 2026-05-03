@@ -7,6 +7,8 @@ import type {
   TaskPriority,
   ActionPlan,
   CreateActionPlanRequest,
+  CreateActionPlanApiRequest,
+  UpdateActionPlanRequest,
   UpdateTaskRequest,
   TaskAttachment,
 } from '@shared/types/taskTypes';
@@ -127,7 +129,16 @@ let mockActionPlans: ActionPlan[] = [
     caseTitle: 'Систематические задержки поставок',
     title: 'План корректирующих действий для случая CS-2024-004',
     description: 'Недостаточная производственная мощность поставщика для выполнения обязательств',
-    status: 'IN_PROGRESS',
+    caseStatus: 'ACTION_IN_PROGRESS',
+    riskObjectName: 'Контрагент ООО «Альфа»',
+    details: {
+      title: 'Задержки поставок по договору',
+      severity: 'HIGH',
+      description:
+        'Зафиксированы множественные отклонения от сроков приемки без согласованного продления.',
+      recommendation:
+        'Пересмотреть условия контроля сроков и согласовать план компенсации с поставщиком.',
+    },
     createdBy: '1',
     createdByName: 'Иван Иванов',
     createdAt: '2024-11-29T10:00:00Z',
@@ -273,7 +284,7 @@ http.patch(`${API_BASE_URL}/tasks/:taskId`, async ({ request, params }) => {
         mockActionPlans[planIndex].progressPercentage = Math.round((completedTasks / planTasks.length) * 100);
         
         if (completedTasks === planTasks.length) {
-          mockActionPlans[planIndex].status = 'COMPLETED';
+          mockActionPlans[planIndex].caseStatus = 'CLOSED';
         }
       }
     }
@@ -335,40 +346,69 @@ http.patch(`${API_BASE_URL}/tasks/:taskId`, async ({ request, params }) => {
     return HttpResponse.json(plan);
   }),
 
-  // POST /api/action-plans - Создать план действий
+  // POST /api/action-plans — создать план или заменить задачи существующего (caseId + title)
   http.post(`${API_BASE_URL.replace('/api/v1', '')}/api/action-plans`, async ({ request }) => {
     await delay(600);
-    const body = await request.json() as CreateActionPlanRequest;
-    console.log('➕ [MSW] Creating action plan:', body);
-    
+    const body = await request.json() as CreateActionPlanRequest | CreateActionPlanApiRequest;
+    console.log('➕ [MSW] POST action plan:', body);
+
+    const mapReqToTasks = (planId: string): Task[] =>
+      body.tasks.map((taskReq, index) => ({
+        id: `TASK-${String(mockTasks.length + index + 1).padStart(3, '0')}`,
+        title: taskReq.title,
+        description: taskReq.description,
+        status: 'TODO' as TaskStatus,
+        priority: taskReq.priority,
+        actionPlanId: planId,
+        caseId: body.caseId,
+        assigneeId: 'assigneeId' in taskReq && taskReq.assigneeId ? taskReq.assigneeId : '1',
+        assigneeName: 'Иван Иванов',
+        createdBy: '1',
+        createdByName: 'Иван Иванов',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        dueDate: taskReq.dueDate,
+        isOverdue: false,
+        daysUntilDue: Math.floor(
+          (new Date(taskReq.dueDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+        ),
+      }));
+
+    const existingIdx = mockActionPlans.findIndex(
+      (p) => p.caseId === body.caseId && p.title === body.title
+    );
+
+    if (existingIdx >= 0) {
+      const planId = mockActionPlans[existingIdx].id;
+      mockTasks = mockTasks.filter((t) => t.actionPlanId !== planId);
+      const newTasks = mapReqToTasks(planId);
+      mockTasks.push(...newTasks);
+
+      const prev = mockActionPlans[existingIdx];
+      const completed = newTasks.filter((t) => t.status === 'DONE').length;
+      mockActionPlans[existingIdx] = {
+        ...prev,
+        title: body.title,
+        description: body.description,
+        tasks: newTasks,
+        totalTasks: newTasks.length,
+        completedTasks: completed,
+        progressPercentage:
+          newTasks.length > 0 ? Math.round((completed / newTasks.length) * 100) : 0,
+      };
+
+      return HttpResponse.json(mockActionPlans[existingIdx], { status: 200 });
+    }
+
     const newPlanId = `AP-2024-${String(mockActionPlans.length + 1).padStart(3, '0')}`;
-    
-    // Создать задачи плана
-    const newTasks: Task[] = body.tasks.map((taskReq, index) => ({
-      id: `TASK-${String(mockTasks.length + index + 1).padStart(3, '0')}`,
-      title: taskReq.title,
-      description: taskReq.description,
-      status: 'TODO' as TaskStatus,
-      priority: taskReq.priority,
-      actionPlanId: newPlanId,
-      caseId: body.caseId,
-      assigneeId: taskReq.assigneeId,
-      assigneeName: 'Иван Иванов',
-      createdBy: '1',
-      createdByName: 'Иван Иванов',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      dueDate: taskReq.dueDate,
-      isOverdue: false,
-      daysUntilDue: Math.floor((new Date(taskReq.dueDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)),
-    }));
-    
+    const newTasks = mapReqToTasks(newPlanId);
     mockTasks.push(...newTasks);
-    
+
     const newPlan: ActionPlan = {
       id: newPlanId,
       caseId: body.caseId,
       caseTitle: `Случай ${body.caseId}`,
+      caseStatus: 'ACTION_PLAN',
       title: body.title,
       description: body.description,
       status: 'DRAFT',
@@ -380,31 +420,84 @@ http.patch(`${API_BASE_URL}/tasks/:taskId`, async ({ request, params }) => {
       completedTasks: 0,
       progressPercentage: 0,
     };
-    
+
     mockActionPlans.push(newPlan);
     return HttpResponse.json(newPlan, { status: 201 });
   }),
 
-  // POST /action-plans/:planId/submit - Отправить план на верификацию
-  http.post(`${API_BASE_URL}/action-plans/:planId/submit`, async ({ params }) => {
-    await delay(400);
+  http.delete(`${API_BASE_URL.replace('/api/v1', '')}/api/action-plans/:planId`, async ({ params }) => {
+    await delay(300);
     const { planId } = params;
-    console.log(`📤 [MSW] Submitting action plan ${planId} for verification`);
-    
-    const index = mockActionPlans.findIndex(p => p.id === planId);
-    
+    const index = mockActionPlans.findIndex((p) => p.id === planId);
     if (index === -1) {
       return HttpResponse.json(
         { message: 'План не найден', code: 'PLAN_NOT_FOUND' },
         { status: 404 }
       );
     }
-    
+    mockActionPlans.splice(index, 1);
+    mockTasks = mockTasks.filter((t) => t.actionPlanId !== planId);
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.patch(`${API_BASE_URL.replace('/api/v1', '')}/api/action-plans/:planId`, async ({ params, request }) => {
+    await delay(350);
+    const { planId } = params;
+    const body = await request.json() as UpdateActionPlanRequest;
+    const index = mockActionPlans.findIndex((p) => p.id === planId);
+    if (index === -1) {
+      return HttpResponse.json(
+        { message: 'План не найден', code: 'PLAN_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
     mockActionPlans[index] = {
       ...mockActionPlans[index],
-      status: 'PENDING_APPROVAL',
+      title: body.title,
+      description: body.description,
+      comment: body.comment,
     };
-    
     return HttpResponse.json(mockActionPlans[index]);
+  }),
+
+  http.post(`${API_BASE_URL.replace('/api/v1', '')}/api/action-plans/:planId/submit`, async ({ params }) => {
+    await delay(400);
+    const { planId } = params;
+    console.log(`📤 [MSW] Submitting action plan ${planId} for verification`);
+
+    const index = mockActionPlans.findIndex((p) => p.id === planId);
+
+    if (index === -1) {
+      return HttpResponse.json(
+        { message: 'План не найден', code: 'PLAN_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+
+    const plan = mockActionPlans[index];
+    mockActionPlans[index] = {
+      ...plan,
+      caseStatus: 'WAITING_VERIFICATION',
+    };
+
+    const now = new Date().toISOString();
+    const body = {
+      id: String(planId),
+      incidentId: `incident-${plan.caseId}`,
+      findingId: 'finding-msw',
+      assignedUserId: null,
+      status: 'WAITING_VERIFICATION',
+      investigation: {
+        id: `investigation-${plan.caseId}`,
+        caseId: plan.caseId,
+        investigationNotes: 'Мок расследования после отправки плана',
+        rootCause: 'Мок первопричины',
+        requiresCorrectiveAction: true,
+        createdAt: now,
+        updatedAt: now,
+      },
+    };
+
+    return HttpResponse.json(body);
   }),
 ];

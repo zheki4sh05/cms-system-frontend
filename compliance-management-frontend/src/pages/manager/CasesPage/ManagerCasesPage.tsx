@@ -58,6 +58,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { CaseApi } from '@shared/lib/api/caseApi';
+import { getFileKindShortLabel } from '@shared/lib/fileDisplay';
 import { TaskApi } from '@shared/lib/api/taskApi';
 import { RuleApi } from '@shared/lib/api/ruleApi';
 import { IncidentApi } from '@shared/lib/api/incidentApi';
@@ -114,6 +115,11 @@ export const ManagerCasesPage: FC = observer(() => {
   const [responsibleLoading, setResponsibleLoading] = useState(false);
   const [attachmentDownloadId, setAttachmentDownloadId] = useState<string | null>(null);
   const [attachmentDeleteId, setAttachmentDeleteId] = useState<string | null>(null);
+
+  const [actionPlanDialogOpen, setActionPlanDialogOpen] = useState(false);
+  const [actionPlanTitle, setActionPlanTitle] = useState('');
+  const [actionPlanDescription, setActionPlanDescription] = useState('');
+  const [actionPlanSubmitting, setActionPlanSubmitting] = useState(false);
 
   useEffect(() => {
     loadCases();
@@ -238,6 +244,44 @@ export const ManagerCasesPage: FC = observer(() => {
     setResponsibleLoading(false);
     setAttachmentDownloadId(null);
     setAttachmentDeleteId(null);
+    setActionPlanDialogOpen(false);
+    setActionPlanTitle('');
+    setActionPlanDescription('');
+    setActionPlanSubmitting(false);
+  };
+
+  const handleOpenActionPlanDialog = () => {
+    if (!selectedCase) return;
+    const caseId = selectedCase.caseId || selectedCase.id;
+    setActionPlanTitle(`План корректирующих действий для случая ${caseId}`);
+    setActionPlanDescription(
+      selectedCase.rootCause?.trim() ? selectedCase.rootCause.trim() : ''
+    );
+    setActionPlanDialogOpen(true);
+  };
+
+  const handleSubmitActionPlan = async () => {
+    if (!selectedCase || !actionPlanTitle.trim()) return;
+    const caseId = selectedCase.caseId || selectedCase.id;
+    setActionPlanSubmitting(true);
+    try {
+      await TaskApi.createActionPlan({
+        caseId,
+        title: actionPlanTitle.trim(),
+        description: actionPlanDescription.trim(),
+        tasks: [],
+      });
+      await loadCases();
+      setActionPlanDialogOpen(false);
+      setActionPlanTitle('');
+      setActionPlanDescription('');
+      handleCloseDialog();
+      navigate('/manager/tasks', { state: { tasksTab: 'action-plans' } });
+    } catch (error) {
+      console.error('Failed to create action plan:', error);
+    } finally {
+      setActionPlanSubmitting(false);
+    }
   };
 
   const handleAddComment = async () => {
@@ -312,18 +356,6 @@ export const ManagerCasesPage: FC = observer(() => {
     } catch (error) {
       console.error('Failed to save investigation:', error);
     }
-  };
-
-  const handleCreateActionPlan = () => {
-    if (!selectedCase) return;
-    
-    // Перейти на страницу задач с параметром для создания плана
-    navigate('/manager/tasks', { 
-      state: { 
-        createPlanForCase: selectedCase.id,
-        caseTitle: selectedCase.title,
-      } 
-    });
   };
 
   const handleCloseCase = async () => {
@@ -994,7 +1026,8 @@ export const ManagerCasesPage: FC = observer(() => {
                             secondary={
                               <>
                                 <Typography variant="caption" component="span">
-                                  {(attachment.fileSize / 1024).toFixed(2)} KB • {attachment.fileType}
+                                  {(attachment.fileSize / 1024).toFixed(2)} KB •{' '}
+                                  {getFileKindShortLabel(attachment.fileName, attachment.fileType)}
                                 </Typography>
                                 <br />
                                 <Typography variant="caption" color="text.secondary">
@@ -1038,24 +1071,73 @@ export const ManagerCasesPage: FC = observer(() => {
                 {requiresAction ? (
                   <Button
                     variant="contained"
-                    onClick={handleCreateActionPlan}
+                    onClick={handleOpenActionPlanDialog}
                     startIcon={<AddIcon />}
                   >
                     Создать план действий
                   </Button>
                 ) : (
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    onClick={handleCloseCase}
-                    startIcon={<CloseIcon />}
-                  >
-                    Закрыть случай
-                  </Button>
+                  selectedCase?.status !== 'ACTION_PLAN' && (
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      onClick={handleCloseCase}
+                      startIcon={<CloseIcon />}
+                    >
+                      Закрыть случай
+                    </Button>
+                  )
                 )}
               </DialogActions>
             </>
           )}
+        </Dialog>
+
+        <Dialog
+          open={actionPlanDialogOpen}
+          onClose={() => !actionPlanSubmitting && setActionPlanDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>Создание плана действий</DialogTitle>
+          <DialogContent>
+            {selectedCase && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Случай: {selectedCase.title} ({selectedCase.caseId || selectedCase.id})
+              </Typography>
+            )}
+            <TextField
+              fullWidth
+              label="Название плана"
+              value={actionPlanTitle}
+              onChange={(e) => setActionPlanTitle(e.target.value)}
+              sx={{ mb: 2 }}
+              required
+              disabled={actionPlanSubmitting}
+            />
+            <TextField
+              fullWidth
+              label="Описание"
+              placeholder="Краткое описание плана / основание"
+              multiline
+              minRows={3}
+              value={actionPlanDescription}
+              onChange={(e) => setActionPlanDescription(e.target.value)}
+              disabled={actionPlanSubmitting}
+            />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setActionPlanDialogOpen(false)} disabled={actionPlanSubmitting}>
+              Отмена
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => void handleSubmitActionPlan()}
+              disabled={actionPlanSubmitting || !actionPlanTitle.trim()}
+            >
+              {actionPlanSubmitting ? 'Создание…' : 'Создать'}
+            </Button>
+          </DialogActions>
         </Dialog>
       </Box>
     </Container>

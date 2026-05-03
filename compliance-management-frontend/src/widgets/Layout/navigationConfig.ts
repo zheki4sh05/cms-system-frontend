@@ -28,13 +28,6 @@ export interface NavigationItem {
 export const navigationItems: NavigationItem[] = [
   // ========== МЕНЕДЖЕР ==========
   {
-    id: 'manager-dashboard',
-    label: 'Главная панель',
-    path: '/manager/dashboard',
-    icon: DashboardOutlined,
-    roles: [UserRoleValues.MANAGER],
-  },
-  {
     id: 'manager-incidents',
     label: 'Инциденты',
     path: '/manager/incidents',

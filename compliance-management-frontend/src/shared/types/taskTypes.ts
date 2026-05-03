@@ -20,7 +20,10 @@ export interface Task {
   description: string;
   status: TaskStatus;
   priority: TaskPriority;
-  
+
+  /** Ответ POST /api/action-plans */
+  caseStatus?: unknown;
+
   // Связь с планом и случаем
   actionPlanId?: string;
   caseId?: string;
@@ -41,6 +44,8 @@ export interface Task {
   // Доказательства выполнения
   evidenceDescription?: string;
   evidenceAttachments?: TaskAttachment[];
+  evidenceDescriptionInprogress?: unknown;
+  evidenceDescriptionDone?: unknown;
   
   // Статус
   isOverdue: boolean;
@@ -60,16 +65,26 @@ export interface TaskAttachment {
 export interface ActionPlan {
   id: string;
   caseId: string;
-  caseTitle: string;
-  
+  incidentId?: string;
+  /** Если сервер не возвращает название случая */
+  caseTitle?: string;
+  /** Статус случая с сервера (например POST /api/action-plans) */
+  caseStatus?: string;
+
+  /** GET /api/action-plans — название рискового объекта */
+  riskObjectName?: string;
+  /** GET /api/action-plans — произвольные детали (часто как у finding в инциденте) */
+  details?: Record<string, unknown>;
+
   title: string;
   description: string;
-  
-  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED';
-  
-  createdBy: string;
-  createdByName: string;
-  createdAt: string;
+  comment?: string | null;
+
+  status?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED';
+
+  createdBy?: string;
+  createdByName?: string;
+  createdAt?: string;
   
   approvedBy?: string;
   approvedByName?: string;
@@ -78,11 +93,11 @@ export interface ActionPlan {
   rejectionReason?: string;
   
   tasks: Task[];
-  
-  // Прогресс
-  totalTasks: number;
-  completedTasks: number;
-  progressPercentage: number;
+
+  // Прогресс (могут отсутствовать в ответе API — тогда считаются из tasks)
+  totalTasks?: number;
+  completedTasks?: number;
+  progressPercentage?: number;
 }
 
 export interface CreateActionPlanRequest {
@@ -102,6 +117,33 @@ export interface CreateActionPlanApiRequest {
     priority: TaskPriority;
     dueDate: string;
   }>;
+}
+
+/** Тело PATCH /api/action-plans/{planId} */
+export interface UpdateActionPlanRequest {
+  title: string;
+  description: string;
+  comment: string | null;
+}
+
+/** Ответ POST /api/action-plans/{planId}/submit */
+export interface ActionPlanInvestigationSummary {
+  id: string;
+  caseId: string;
+  investigationNotes: string;
+  rootCause: string;
+  requiresCorrectiveAction: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SubmitActionPlanResponse {
+  id: string;
+  incidentId?: string;
+  findingId?: string;
+  assignedUserId?: unknown;
+  status: string;
+  investigation?: ActionPlanInvestigationSummary;
 }
 
 export interface CreateTaskRequest {

@@ -78,6 +78,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { CaseApi } from '@shared/lib/api/caseApi';
+import { getFileKindShortLabel } from '@shared/lib/fileDisplay';
 import {
   CaseSeverity,
   type Case,
@@ -1100,7 +1101,7 @@ export const SupervisorCasesPage: FC = observer(() => {
                         </ListItemIcon>
                         <ListItemText
                           primary={att.fileName}
-                          secondary={`${(att.fileSize / 1024).toFixed(2)} KB`}
+                          secondary={`${(att.fileSize / 1024).toFixed(2)} KB • ${getFileKindShortLabel(att.fileName, att.fileType)}`}
                         />
                       </ListItem>
                     ))}

@@ -38,6 +38,20 @@ class ApiClient {
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
+
+        try {
+          const userRaw = localStorage.getItem('user');
+          if (userRaw) {
+            const parsed = JSON.parse(userRaw) as { employeeId?: string };
+            const employeeId = parsed?.employeeId?.trim();
+            if (employeeId) {
+              config.headers['EmployeeId'] = employeeId;
+            }
+          }
+        } catch {
+          /* игнорируем битый JSON user */
+        }
+
         return config;
       },
       (error) => {

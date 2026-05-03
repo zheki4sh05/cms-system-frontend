@@ -34,12 +34,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Stepper,
-  Step,
-  StepLabel,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   LinearProgress,
   Tooltip,
   Avatar,
@@ -53,16 +47,20 @@ import {
   Error as ErrorIcon,
   PlayArrow as StartIcon,
   AttachFile as AttachIcon,
-  ExpandMore as ExpandMoreIcon,
   Visibility as ViewIcon,
-  Edit as EditIcon,
   Send as SendIcon,
   Info as InfoIcon,
   Assignment as AssignmentIcon,
   Close as CloseIcon,
+  DeleteOutline as DeleteOutlineIcon,
+  Edit as EditIcon,
 } from '@mui/icons-material';
 import { TaskApi } from '@shared/lib/api/taskApi';
 import { CaseApi } from '@shared/lib/api/caseApi';
+import {
+  ActionPlanDetailsSection,
+  ActionPlanRiskObjectCaption,
+} from '@shared/lib/actionPlanView';
 import type {
   Task,
   TaskStatus,
@@ -71,7 +69,7 @@ import type {
   CreateTaskRequest,
   TaskStatistics,
 } from '@shared/types/taskTypes';
-import type { Case, CaseStatus } from '@shared/types/caseTypes';
+import type { Case } from '@shared/types/caseTypes';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -102,7 +100,22 @@ export const ManagerTasksPage: FC = observer(() => {
   // Диалоги
   const [createPlanDialogOpen, setCreatePlanDialogOpen] = useState(false);
   const [viewPlanDialogOpen, setViewPlanDialogOpen] = useState(false);
+  const [editPlanDialogOpen, setEditPlanDialogOpen] = useState(false);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [editPlanTitle, setEditPlanTitle] = useState('');
+  const [editPlanDescription, setEditPlanDescription] = useState('');
+  const [editPlanComment, setEditPlanComment] = useState('');
+  const [editPlanSaving, setEditPlanSaving] = useState(false);
+
+  const [viewNewTaskTitle, setViewNewTaskTitle] = useState('');
+  const [viewNewTaskDescription, setViewNewTaskDescription] = useState('');
+  const [viewNewTaskPriority, setViewNewTaskPriority] = useState<TaskPriority>('NORMAL');
+  const [viewNewTaskDueDate, setViewNewTaskDueDate] = useState(() =>
+    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+  );
+  const [viewAddTaskSaving, setViewAddTaskSaving] = useState(false);
   
   // Создание плана
   const [selectedCaseForPlan, setSelectedCaseForPlan] = useState<string | null>(null);
@@ -120,28 +133,49 @@ export const ManagerTasksPage: FC = observer(() => {
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
 
   useEffect(() => {
-    loadData();
-    
-    // Проверить, нужно ли открыть диалог создания плана
-    const state = location.state as any;
-    if (state?.createPlanForCase) {
-      handleOpenCreatePlan(state.createPlanForCase);
+    void loadData();
+
+    const state = location.state as { createPlanForCase?: string; tasksTab?: string } | null | undefined;
+    if (state?.tasksTab === 'action-plans') {
+      setTabValue(1);
     }
-  }, [location]);
+    if (state?.createPlanForCase) {
+      void handleOpenCreatePlan(state.createPlanForCase);
+    }
+    if (state?.tasksTab === 'action-plans' || state?.createPlanForCase) {
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.pathname, location.state]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [tasksData, plansData, statsData] = await Promise.all([
+      const [tasksResult, plansResult, statsResult] = await Promise.allSettled([
         TaskApi.getMyTasks(),
         TaskApi.getActionPlans(),
         TaskApi.getTaskStatistics(),
       ]);
-      setTasks(tasksData);
-      setActionPlans(plansData);
-      setStatistics(statsData);
-    } catch (error) {
-      console.error('Failed to load tasks:', error);
+
+      if (tasksResult.status === 'fulfilled') {
+        setTasks(tasksResult.value);
+      } else {
+        console.error('Failed to load tasks:', tasksResult.reason);
+        setTasks([]);
+      }
+
+      if (plansResult.status === 'fulfilled') {
+        setActionPlans(plansResult.value);
+      } else {
+        console.error('Failed to load action plans:', plansResult.reason);
+        setActionPlans([]);
+      }
+
+      if (statsResult.status === 'fulfilled') {
+        setStatistics(statsResult.value);
+      } else {
+        console.error('Failed to load task statistics:', statsResult.reason);
+        setStatistics(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -185,8 +219,8 @@ export const ManagerTasksPage: FC = observer(() => {
   };
 
   const handleCreatePlan = async () => {
-    if (!selectedCaseForPlan || planTasks.length === 0) return;
-    
+    if (!selectedCaseForPlan) return;
+
     try {
       const plan = await TaskApi.createActionPlan({
         caseId: selectedCaseForPlan,
@@ -195,15 +229,10 @@ export const ManagerTasksPage: FC = observer(() => {
         tasks: planTasks,
       });
 
-      await CaseApi.updateCase(selectedCaseForPlan, {
-        status: 'ACTION_PLAN' as CaseStatus,
-      });
-      
       await loadData();
       setCreatePlanDialogOpen(false);
       resetPlanForm();
-      
-      // Показать созданный план
+
       setSelectedPlan(plan);
       setViewPlanDialogOpen(true);
     } catch (error) {
@@ -211,14 +240,159 @@ export const ManagerTasksPage: FC = observer(() => {
     }
   };
 
+  const handleDeleteActionPlan = async (planId: string) => {
+    if (!window.confirm('Удалить этот план действий?')) return;
+
+    try {
+      await TaskApi.deleteActionPlan(planId);
+      await loadData();
+      if (selectedPlan?.id === planId) {
+        setViewPlanDialogOpen(false);
+        setSelectedPlan(null);
+      }
+    } catch (error) {
+      console.error('Failed to delete action plan:', error);
+    }
+  };
+
+  const resetViewNewTaskForm = () => {
+    setViewNewTaskTitle('');
+    setViewNewTaskDescription('');
+    setViewNewTaskPriority('NORMAL');
+    setViewNewTaskDueDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString());
+  };
+
+  const handleOpenPlanDetails = (plan: ActionPlan) => {
+    setSelectedPlan(plan);
+    resetViewNewTaskForm();
+    setViewPlanDialogOpen(true);
+  };
+
+  const handleAppendTaskToPlan = async () => {
+    if (!selectedPlan || !viewNewTaskTitle.trim() || viewAddTaskSaving) return;
+
+    const nextTask = {
+      title: viewNewTaskTitle.trim(),
+      description: viewNewTaskDescription.trim(),
+      priority: viewNewTaskPriority,
+      dueDate: viewNewTaskDueDate,
+    };
+
+    const tasksPayload = [...TaskApi.tasksForActionPlanPost(selectedPlan.tasks), nextTask];
+
+    setViewAddTaskSaving(true);
+    try {
+      const updated = await TaskApi.postActionPlan({
+        caseId: selectedPlan.caseId,
+        title: selectedPlan.title,
+        description: selectedPlan.description,
+        tasks: tasksPayload,
+      });
+
+      setSelectedPlan(updated);
+      setActionPlans((prev) => {
+        const byId = prev.findIndex((p) => p.id === selectedPlan.id);
+        if (byId !== -1) {
+          const next = [...prev];
+          next[byId] = updated;
+          return next;
+        }
+        const byCaseTitle = prev.findIndex(
+          (p) => p.caseId === updated.caseId && p.title === updated.title
+        );
+        if (byCaseTitle !== -1) {
+          const next = [...prev];
+          next[byCaseTitle] = updated;
+          return next;
+        }
+        return [...prev, updated];
+      });
+      await loadData();
+      resetViewNewTaskForm();
+    } catch (error) {
+      console.error('Failed to add task to action plan:', error);
+    } finally {
+      setViewAddTaskSaving(false);
+    }
+  };
+
+  const handleOpenEditPlan = (plan: ActionPlan) => {
+    setEditingPlanId(plan.id);
+    setEditPlanTitle(plan.title);
+    setEditPlanDescription(plan.description);
+    setEditPlanComment(
+      typeof plan.comment === 'string' ? plan.comment : ''
+    );
+    setEditPlanDialogOpen(true);
+  };
+
+  const resetEditPlanForm = () => {
+    setEditPlanDialogOpen(false);
+    setEditingPlanId(null);
+    setEditPlanTitle('');
+    setEditPlanDescription('');
+    setEditPlanComment('');
+  };
+
+  const handleCloseEditPlanDialog = () => {
+    if (editPlanSaving) return;
+    resetEditPlanForm();
+  };
+
+  const handleSaveEditedPlan = async () => {
+    if (!editingPlanId || !editPlanTitle.trim()) return;
+
+    setEditPlanSaving(true);
+    try {
+      const updated = await TaskApi.updateActionPlan(editingPlanId, {
+        title: editPlanTitle.trim(),
+        description: editPlanDescription.trim(),
+        comment: editPlanComment.trim() === '' ? null : editPlanComment.trim(),
+      });
+
+      setActionPlans((prev) =>
+        prev.map((p) =>
+          p.id === editingPlanId
+            ? {
+                ...p,
+                title: updated.title,
+                description: updated.description,
+                comment: updated.comment,
+                incidentId: updated.incidentId ?? p.incidentId,
+                caseId: updated.caseId,
+              }
+            : p
+        )
+      );
+
+      if (selectedPlan?.id === editingPlanId) {
+        setSelectedPlan((prev) =>
+          prev
+            ? {
+                ...prev,
+                title: updated.title,
+                description: updated.description,
+                comment: updated.comment,
+                incidentId: updated.incidentId ?? prev.incidentId,
+                caseId: updated.caseId,
+              }
+            : null
+        );
+      }
+
+      resetEditPlanForm();
+    } catch (error) {
+      console.error('Failed to update action plan:', error);
+    } finally {
+      setEditPlanSaving(false);
+    }
+  };
+
   const handleSubmitPlanForVerification = async () => {
     if (!selectedPlan) return;
-    
+
     try {
       await TaskApi.submitForVerification(selectedPlan.id);
-      await CaseApi.updateCase(selectedPlan.caseId, {
-        status: 'WAITING_VERIFICATION' as CaseStatus,
-      });
       await loadData();
       setViewPlanDialogOpen(false);
       setSelectedPlan(null);
@@ -305,28 +479,56 @@ export const ManagerTasksPage: FC = observer(() => {
     return labels[status];
   };
 
-  const getPlanStatusLabel = (status: ActionPlan['status']) => {
-    const labels = {
-      DRAFT: 'Черновик',
-      PENDING_APPROVAL: 'На утверждении',
-      APPROVED: 'Утвержден',
+  /** Статус случая из GET /api/action-plans → поле caseStatus (отдельного статуса плана нет) */
+  const getCaseWorkflowStatusLabel = (caseStatus: string) => {
+    const s = caseStatus.trim().toUpperCase();
+    const labels: Record<string, string> = {
+      OPEN: 'Открыт',
+      ASSIGNED: 'Назначен ответственный',
       IN_PROGRESS: 'В работе',
-      COMPLETED: 'Завершен',
+      INVESTIGATING: 'Расследование',
+      ACTION_PLAN: 'План действий',
+      ACTION_IN_PROGRESS: 'План в работе',
+      WAITING_VERIFICATION: 'На проверке',
+      CLOSED: 'Закрыт',
       REJECTED: 'Отклонен',
+      ESCALATED_TO_CASE: 'Эскалация',
     };
-    return labels[status];
+    return labels[s] ?? caseStatus;
   };
 
-  const getPlanStatusColor = (status: ActionPlan['status']) => {
-    switch (status) {
-      case 'DRAFT': return 'default';
-      case 'PENDING_APPROVAL': return 'warning';
-      case 'APPROVED': return 'info';
-      case 'IN_PROGRESS': return 'primary';
-      case 'COMPLETED': return 'success';
+  const getCaseWorkflowStatusColor = (caseStatus: string) => {
+    const s = caseStatus.trim().toUpperCase();
+    switch (s) {
+      case 'OPEN': return 'info';
+      case 'ASSIGNED': return 'primary';
+      case 'IN_PROGRESS': return 'warning';
+      case 'INVESTIGATING': return 'primary';
+      case 'ACTION_PLAN': return 'warning';
+      case 'ACTION_IN_PROGRESS': return 'info';
+      case 'WAITING_VERIFICATION': return 'secondary';
+      case 'CLOSED': return 'success';
       case 'REJECTED': return 'error';
+      case 'ESCALATED_TO_CASE': return 'warning';
+      default: return 'default';
     }
   };
+
+  const getActionPlanStatusLabel = (plan: ActionPlan) => {
+    const cs = plan.caseStatus?.trim();
+    if (!cs) return 'Не указан';
+    return getCaseWorkflowStatusLabel(cs);
+  };
+
+  const getActionPlanStatusColor = (plan: ActionPlan) => {
+    const cs = plan.caseStatus?.trim();
+    if (!cs) return 'default';
+    return getCaseWorkflowStatusColor(cs);
+  };
+
+  /** Отправка на утверждение доступна, пока случай в фазе плана действий */
+  const canSubmitActionPlanForVerification = (plan: ActionPlan) =>
+    plan.caseStatus?.trim().toUpperCase() === 'ACTION_PLAN';
 
   const filteredTasks = tasks.filter(t =>
     t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -600,9 +802,7 @@ export const ManagerTasksPage: FC = observer(() => {
           <TabPanel value={tabValue} index={1}>
             <Alert severity="info" sx={{ mb: 3 }}>
               <Typography variant="body2">
-                Планы корректирующих действий создаются после завершения расследования случая. 
-                Перейдите на вкладку <strong>Случаи</strong>, завершите расследование и выберите 
-                "Требуются корректирующие действия".
+                Планы создаются из карточки случая после расследования (кнопка «Создать план действий»).
               </Typography>
             </Alert>
 
@@ -613,7 +813,7 @@ export const ManagerTasksPage: FC = observer(() => {
                   Нет планов действий
                 </Typography>
                 <Typography variant="body2" color="text.secondary" paragraph>
-                  Планы будут созданы после завершения расследования случаев
+                  Создайте план из раздела «Случаи»
                 </Typography>
                 <Button
                   variant="contained"
@@ -623,119 +823,83 @@ export const ManagerTasksPage: FC = observer(() => {
                 </Button>
               </Box>
             ) : (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {actionPlans.map(plan => (
-                  <Accordion key={plan.id}>
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%', pr: 2 }}>
-                        <AssignmentIcon color="primary" />
-                        <Box sx={{ flexGrow: 1 }}>
-                          <Typography variant="body1" fontWeight="medium">
-                            {plan.title}
-                          </Typography>
+              <List disablePadding sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                {actionPlans.map((plan) => (
+                  <Paper key={plan.id} variant="outlined" sx={{ p: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, flexWrap: 'wrap' }}>
+                      <AssignmentIcon color="primary" sx={{ mt: 0.25 }} />
+                      <Box sx={{ flex: '1 1 220px', minWidth: 0 }}>
+                        <Typography variant="subtitle1" fontWeight="medium">
+                          {plan.title}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                          {plan.description}
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1, alignItems: 'center' }}>
+                          {plan.riskObjectName?.trim() ? (
+                            <Typography variant="caption" color="text.secondary" component="div">
+                              План для случая с объектом{' '}
+                              <Box component="span" sx={{ fontWeight: 700 }}>
+                                {plan.riskObjectName}
+                              </Box>
+                            </Typography>
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">
+                              Случай: {plan.caseTitle ?? plan.caseId}
+                            </Typography>
+                          )}
+                          <Chip
+                            label={getActionPlanStatusLabel(plan)}
+                            color={getActionPlanStatusColor(plan)}
+                            size="small"
+                          />
                           <Typography variant="caption" color="text.secondary">
-                            Случай: {plan.caseTitle}
+                            Задачи: {plan.completedTasks ?? 0}/{plan.totalTasks ?? plan.tasks.length}
+                            {(plan.progressPercentage ?? 0) > 0 &&
+                              ` · ${plan.progressPercentage}%`}
                           </Typography>
                         </Box>
-                        <Chip
-                          label={getPlanStatusLabel(plan.status)}
-                          color={getPlanStatusColor(plan.status)}
-                          size="small"
-                        />
-                        <Box sx={{ minWidth: 120 }}>
-                          <Typography variant="caption" color="text.secondary">
-                            Прогресс: {plan.progressPercentage}%
-                          </Typography>
+                        {(plan.progressPercentage ?? 0) > 0 && (
                           <LinearProgress
                             variant="determinate"
-                            value={plan.progressPercentage}
-                            sx={{ mt: 0.5 }}
+                            value={plan.progressPercentage ?? 0}
+                            sx={{ mt: 1, maxWidth: 360 }}
                           />
-                        </Box>
+                        )}
                       </Box>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      <Typography variant="body2" paragraph>
-                        {plan.description}
-                      </Typography>
-                      <Divider sx={{ my: 2 }} />
-                      
-                      <Typography variant="subtitle2" gutterBottom>
-                        Задачи ({plan.completedTasks}/{plan.totalTasks})
-                      </Typography>
-                      <List>
-                        {plan.tasks.map(task => (
-                          <ListItem
-                            key={task.id}
-                            sx={{
-                              border: 1,
-                              borderColor: 'divider',
-                              borderRadius: 1,
-                              mb: 1,
-                              cursor: 'pointer',
-                              '&:hover': { bgcolor: 'action.hover' },
-                            }}
-                            onClick={() => handleOpenTask(task)}
+                      <Box sx={{ display: 'flex', gap: 0.5, ml: 'auto' }}>
+                        <Tooltip title="Просмотр">
+                          <IconButton
+                            color="primary"
+                            aria-label="Просмотр плана"
+                            onClick={() => handleOpenPlanDetails(plan)}
                           >
-                            <ListItemIcon>
-                              {task.status === 'DONE' ? (
-                                <CheckIcon color="success" />
-                              ) : task.isOverdue ? (
-                                <ErrorIcon color="error" />
-                              ) : (
-                                <ScheduleIcon color="action" />
-                              )}
-                            </ListItemIcon>
-                            <ListItemText
-                              primary={task.title}
-                              secondary={
-                                <Box sx={{ display: 'flex', gap: 1, mt: 0.5, alignItems: 'center' }}>
-                                  <Chip
-                                    label={getTaskStatusLabel(task.status)}
-                                    color={getTaskStatusColor(task.status)}
-                                    size="small"
-                                  />
-                                  <Chip
-                                    label={task.priority}
-                                    color={getTaskPriorityColor(task.priority)}
-                                    size="small"
-                                  />
-                                  <Typography variant="caption" color="text.secondary">
-                                    До: {new Date(task.dueDate).toLocaleDateString('ru-RU')}
-                                  </Typography>
-                                </Box>
-                              }
-                            />
-                          </ListItem>
-                        ))}
-                      </List>
-
-                      {plan.status === 'DRAFT' && (
-                        <Button
-                          variant="contained"
-                          startIcon={<SendIcon />}
-                          fullWidth
-                          sx={{ mt: 2 }}
-                          onClick={() => {
-                            setSelectedPlan(plan);
-                            setViewPlanDialogOpen(true);
-                          }}
-                        >
-                          Отправить на утверждение
-                        </Button>
-                      )}
-
-                      {plan.status === 'REJECTED' && plan.rejectionReason && (
-                        <Alert severity="error" sx={{ mt: 2 }}>
-                          <Typography variant="body2">
-                            <strong>Причина отклонения:</strong> {plan.rejectionReason}
-                          </Typography>
-                        </Alert>
-                      )}
-                    </AccordionDetails>
-                  </Accordion>
+                            <ViewIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Редактировать">
+                          <IconButton
+                            color="secondary"
+                            aria-label="Редактировать план"
+                            onClick={() => handleOpenEditPlan(plan)}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Удалить">
+                          <IconButton
+                            color="error"
+                            aria-label="Удалить план"
+                            onClick={() => void handleDeleteActionPlan(plan.id)}
+                          >
+                            <DeleteOutlineIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </Box>
+                  </Paper>
                 ))}
-              </Box>
+              </List>
             )}
           </TabPanel>
         </Paper>
@@ -857,8 +1021,8 @@ export const ManagerTasksPage: FC = observer(() => {
             ))}
 
             {planTasks.length === 0 && (
-              <Alert severity="warning">
-                Добавьте хотя бы одну задачу в план
+              <Alert severity="info" sx={{ mt: 1 }}>
+                Задачи можно добавить позже на странице «Мои задачи» или при редактировании плана (если доступно в системе).
               </Alert>
             )}
           </DialogContent>
@@ -869,7 +1033,10 @@ export const ManagerTasksPage: FC = observer(() => {
             <Button
               variant="contained"
               onClick={handleCreatePlan}
-              disabled={!planTitle || planTasks.length === 0 || planTasks.some(t => !t.title)}
+              disabled={
+                !planTitle ||
+                (planTasks.length > 0 && planTasks.some((t) => !t.title.trim()))
+              }
             >
               Создать план
             </Button>
@@ -889,8 +1056,8 @@ export const ManagerTasksPage: FC = observer(() => {
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Typography variant="h6">{selectedPlan.title}</Typography>
                   <Chip
-                    label={getPlanStatusLabel(selectedPlan.status)}
-                    color={getPlanStatusColor(selectedPlan.status)}
+                    label={getActionPlanStatusLabel(selectedPlan)}
+                    color={getActionPlanStatusColor(selectedPlan)}
                   />
                 </Box>
               </DialogTitle>
@@ -898,19 +1065,26 @@ export const ManagerTasksPage: FC = observer(() => {
                 <Typography variant="body2" paragraph>
                   {selectedPlan.description}
                 </Typography>
-                
+
+                <ActionPlanRiskObjectCaption
+                  riskObjectName={selectedPlan.riskObjectName}
+                  caseTitle={selectedPlan.caseTitle}
+                  caseId={selectedPlan.caseId}
+                />
+
+                <ActionPlanDetailsSection details={selectedPlan.details} />
+
                 <Alert severity="info" sx={{ mb: 3 }}>
                   <Typography variant="body2">
-                    <strong>Случай:</strong> {selectedPlan.caseTitle}
-                  </Typography>
-                  <Typography variant="body2">
-                    <strong>Прогресс:</strong> {selectedPlan.completedTasks} из {selectedPlan.totalTasks} задач выполнено ({selectedPlan.progressPercentage}%)
+                    <strong>Прогресс:</strong> {selectedPlan.completedTasks ?? 0} из{' '}
+                    {selectedPlan.totalTasks ?? selectedPlan.tasks.length} задач выполнено (
+                    {selectedPlan.progressPercentage ?? 0}%)
                   </Typography>
                 </Alert>
 
                 <LinearProgress
                   variant="determinate"
-                  value={selectedPlan.progressPercentage}
+                  value={selectedPlan.progressPercentage ?? 0}
                   sx={{ mb: 3, height: 8, borderRadius: 1 }}
                 />
 
@@ -918,8 +1092,11 @@ export const ManagerTasksPage: FC = observer(() => {
                   Задачи плана
                 </Typography>
                 <List>
-                  {selectedPlan.tasks.map(task => (
-                    <ListItem key={task.id} sx={{ border: 1, borderColor: 'divider', borderRadius: 1, mb: 1 }}>
+                  {selectedPlan.tasks.map((task, taskIndex) => (
+                    <ListItem
+                      key={task.id || `plan-task-${taskIndex}`}
+                      sx={{ border: 1, borderColor: 'divider', borderRadius: 1, mb: 1 }}
+                    >
                       <ListItemIcon>
                         {task.status === 'DONE' ? <CheckIcon color="success" /> : <ScheduleIcon />}
                       </ListItemIcon>
@@ -935,12 +1112,84 @@ export const ManagerTasksPage: FC = observer(() => {
                     </ListItem>
                   ))}
                 </List>
+
+                <Divider sx={{ my: 3 }} />
+
+                <Typography variant="subtitle1" gutterBottom>
+                  Добавить задачу
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid size={{ xs: 12 }}>
+                    <TextField
+                      fullWidth
+                      required
+                      label="Название"
+                      value={viewNewTaskTitle}
+                      onChange={(e) => setViewNewTaskTitle(e.target.value)}
+                      disabled={viewAddTaskSaving}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12 }}>
+                    <TextField
+                      fullWidth
+                      label="Описание"
+                      multiline
+                      minRows={2}
+                      value={viewNewTaskDescription}
+                      onChange={(e) => setViewNewTaskDescription(e.target.value)}
+                      disabled={viewAddTaskSaving}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <FormControl fullWidth disabled={viewAddTaskSaving}>
+                      <InputLabel>Приоритет</InputLabel>
+                      <Select
+                        value={viewNewTaskPriority}
+                        label="Приоритет"
+                        onChange={(e) =>
+                          setViewNewTaskPriority(e.target.value as TaskPriority)
+                        }
+                      >
+                        <MenuItem value="LOW">Низкий</MenuItem>
+                        <MenuItem value="NORMAL">Нормальный</MenuItem>
+                        <MenuItem value="HIGH">Высокий</MenuItem>
+                        <MenuItem value="URGENT">Срочный</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid size={{ xs: 12, sm: 6 }}>
+                    <TextField
+                      fullWidth
+                      label="Срок выполнения"
+                      type="date"
+                      value={viewNewTaskDueDate.split('T')[0]}
+                      onChange={(e) =>
+                        setViewNewTaskDueDate(new Date(e.target.value).toISOString())
+                      }
+                      disabled={viewAddTaskSaving}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12 }}>
+                    <Button
+                      variant="contained"
+                      startIcon={<AddIcon />}
+                      disabled={
+                        viewAddTaskSaving ||
+                        !viewNewTaskTitle.trim()
+                      }
+                      onClick={() => void handleAppendTaskToPlan()}
+                    >
+                      {viewAddTaskSaving ? 'Сохранение…' : 'Добавить задачу'}
+                    </Button>
+                  </Grid>
+                </Grid>
               </DialogContent>
               <DialogActions sx={{ px: 3, pb: 3 }}>
                 <Button onClick={() => setViewPlanDialogOpen(false)}>
                   Закрыть
                 </Button>
-                {selectedPlan.status === 'DRAFT' && (
+                {canSubmitActionPlanForVerification(selectedPlan) && (
                   <Button
                     variant="contained"
                     startIcon={<SendIcon />}
@@ -952,6 +1201,65 @@ export const ManagerTasksPage: FC = observer(() => {
               </DialogActions>
             </>
           )}
+        </Dialog>
+
+        <Dialog
+          open={editPlanDialogOpen}
+          onClose={handleCloseEditPlanDialog}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="h6">Редактирование плана</Typography>
+              <IconButton onClick={handleCloseEditPlanDialog} disabled={editPlanSaving}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            <TextField
+              fullWidth
+              label="Название плана"
+              value={editPlanTitle}
+              onChange={(e) => setEditPlanTitle(e.target.value)}
+              sx={{ mb: 2 }}
+              required
+              disabled={editPlanSaving}
+            />
+            <TextField
+              fullWidth
+              label="Описание плана"
+              multiline
+              minRows={3}
+              value={editPlanDescription}
+              onChange={(e) => setEditPlanDescription(e.target.value)}
+              disabled={editPlanSaving}
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              fullWidth
+              label="Комментарий"
+              placeholder="Пустое поле отправит null"
+              multiline
+              minRows={2}
+              value={editPlanComment}
+              onChange={(e) => setEditPlanComment(e.target.value)}
+              disabled={editPlanSaving}
+            />
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={handleCloseEditPlanDialog} disabled={editPlanSaving}>
+              Отмена
+            </Button>
+            <Button
+              variant="contained"
+              onClick={() => void handleSaveEditedPlan()}
+              disabled={editPlanSaving || !editPlanTitle.trim()}
+            >
+              {editPlanSaving ? 'Сохранение…' : 'Сохранить'}
+            </Button>
+          </DialogActions>
         </Dialog>
 
         {/* Диалог задачи */}
