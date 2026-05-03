@@ -74,6 +74,7 @@ import {
   Assessment as AssessmentIcon,
   Flag as FlagIcon,
   Close as CloseIcon,
+  DeleteOutline as DeleteOutlineIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { CaseApi } from '@shared/lib/api/caseApi';
@@ -87,6 +88,7 @@ import {
   type CaseStatistics,
   type CaseVerificationDetails,
   type VerificationDecision,
+  type CaseViewItem,
 } from '@shared/types/caseTypes';
 
 interface TabPanelProps {
@@ -123,6 +125,13 @@ export const SupervisorCasesPage: FC = observer(() => {
   const [comments, setComments] = useState<CaseComment[]>([]);
   const [attachments, setAttachments] = useState<CaseAttachment[]>([]);
   const [verificationHistory, setVerificationHistory] = useState<any[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+  const [verificationHistoryLoading, setVerificationHistoryLoading] = useState(false);
+  const [caseViewData, setCaseViewData] = useState<CaseViewItem | null>(null);
+  const [caseViewLoading, setCaseViewLoading] = useState(false);
+  const [attachmentDownloadId, setAttachmentDownloadId] = useState<string | null>(null);
+  const [attachmentDeleteId, setAttachmentDeleteId] = useState<string | null>(null);
   
   // Форма верификации
   const [verificationDecision, setVerificationDecision] = useState<'approve' | 'reject'>('approve');
@@ -156,21 +165,100 @@ export const SupervisorCasesPage: FC = observer(() => {
     }
   };
 
+  const handleCloseViewDialog = () => {
+    setViewDialogOpen(false);
+    setCommentsLoading(false);
+    setAttachmentsLoading(false);
+    setVerificationHistoryLoading(false);
+    setCaseViewData(null);
+    setCaseViewLoading(false);
+    setAttachmentDownloadId(null);
+    setAttachmentDeleteId(null);
+  };
+
   const handleOpenCase = async (caseItem: Case) => {
     setSelectedCase(caseItem);
     setViewDialogOpen(true);
-    
+
+    const resolvedCaseId = caseItem.caseId || caseItem.id;
+    setComments([]);
+    setAttachments([]);
+    setVerificationHistory([]);
+    setCaseViewData(null);
+
+    setCaseViewLoading(true);
+    setCommentsLoading(true);
+    setAttachmentsLoading(true);
+    setVerificationHistoryLoading(true);
+
     try {
-      const [commentsData, attachmentsData, historyData] = await Promise.all([
-        CaseApi.getCaseComments(caseItem.id),
-        CaseApi.getCaseAttachments(caseItem.id),
-        CaseApi.getVerificationHistory(caseItem.id),
+      const viewData = await CaseApi.getCaseView(resolvedCaseId);
+      setCaseViewData(viewData);
+    } catch (viewError) {
+      console.error('Failed to load cases view data:', viewError);
+      setCaseViewData(null);
+    } finally {
+      setCaseViewLoading(false);
+    }
+
+    try {
+      const [commentsOutcome, attachmentsOutcome, historyOutcome] = await Promise.allSettled([
+        CaseApi.getCaseComments(resolvedCaseId),
+        CaseApi.getCaseAttachments(resolvedCaseId),
+        CaseApi.getVerificationHistory(resolvedCaseId),
       ]);
-      setComments(commentsData);
-      setAttachments(attachmentsData);
-      setVerificationHistory(historyData);
+
+      if (commentsOutcome.status === 'fulfilled') {
+        setComments(commentsOutcome.value);
+      } else {
+        console.error('Failed to load case comments:', commentsOutcome.reason);
+        setComments([]);
+      }
+
+      if (attachmentsOutcome.status === 'fulfilled') {
+        setAttachments(attachmentsOutcome.value);
+      } else {
+        console.error('Failed to load case attachments:', attachmentsOutcome.reason);
+        setAttachments([]);
+      }
+
+      if (historyOutcome.status === 'fulfilled') {
+        setVerificationHistory(historyOutcome.value);
+      } else {
+        console.error('Failed to load verification history:', historyOutcome.reason);
+        setVerificationHistory([]);
+      }
+    } finally {
+      setCommentsLoading(false);
+      setAttachmentsLoading(false);
+      setVerificationHistoryLoading(false);
+    }
+  };
+
+  const handleDownloadAttachment = async (attachment: CaseAttachment) => {
+    if (!selectedCase?.id) return;
+    const caseId = selectedCase.caseId || selectedCase.id;
+    setAttachmentDownloadId(attachment.id);
+    try {
+      await CaseApi.downloadCaseAttachment(caseId, attachment.id, attachment.fileName);
     } catch (error) {
-      console.error('Failed to load case details:', error);
+      console.error('Failed to download attachment:', error);
+    } finally {
+      setAttachmentDownloadId(null);
+    }
+  };
+
+  const handleDeleteAttachment = async (attachment: CaseAttachment) => {
+    if (!selectedCase?.id) return;
+    const caseId = selectedCase.caseId || selectedCase.id;
+    setAttachmentDeleteId(attachment.id);
+    try {
+      await CaseApi.deleteCaseAttachment(caseId, attachment.id);
+      setAttachments((prev) => prev.filter((a) => a.id !== attachment.id));
+    } catch (error) {
+      console.error('Failed to delete attachment:', error);
+    } finally {
+      setAttachmentDeleteId(null);
     }
   };
 
@@ -266,6 +354,30 @@ export const SupervisorCasesPage: FC = observer(() => {
       ESCALATED_TO_CASE: 'Эскалация'
     };
     return labels[status];
+  };
+
+  const stringifyValue = (value: unknown): string => {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (value && typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return '-';
+      }
+    }
+    return '-';
+  };
+
+  const getRiskSeverityLabel = (severity?: string): string => {
+    if (!severity) return '-';
+    const labels: Record<string, string> = {
+      LOW: 'Низкая',
+      MEDIUM: 'Средняя',
+      HIGH: 'Высокая',
+      CRITICAL: 'Критичная',
+    };
+    return labels[severity.toUpperCase()] || severity;
   };
 
   const filteredCases = cases.filter(c => {
@@ -688,7 +800,7 @@ export const SupervisorCasesPage: FC = observer(() => {
         {/* Диалог просмотра случая (как у менеджера) */}
         <Dialog
           open={viewDialogOpen}
-          onClose={() => setViewDialogOpen(false)}
+          onClose={handleCloseViewDialog}
           maxWidth="md"
           fullWidth
         >
@@ -751,6 +863,90 @@ export const SupervisorCasesPage: FC = observer(() => {
                   </Grid>
                 </Grid>
 
+                {caseViewLoading && (
+                  <>
+                    <Divider sx={{ my: 2 }} />
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 1,
+                        py: 4,
+                      }}
+                    >
+                      <CircularProgress size={36} />
+                      <Typography variant="body2" color="text.secondary">
+                        Загрузка данных правила…
+                      </Typography>
+                    </Box>
+                  </>
+                )}
+                {!caseViewLoading && caseViewData && (
+                  <>
+                    <Divider sx={{ my: 2 }} />
+                    <Typography variant="subtitle2" gutterBottom>
+                      Данные правила
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 6 }}>
+                        <Typography variant="caption" color="text.secondary">Название правила</Typography>
+                        <Typography variant="body2">{stringifyValue(caseViewData.ruleName)}</Typography>
+                      </Grid>
+                      <Grid size={{ xs: 6 }}>
+                        <Typography variant="caption" color="text.secondary">ID правила</Typography>
+                        <Typography variant="body2">{stringifyValue(caseViewData.ruleId)}</Typography>
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Typography variant="caption" color="text.secondary">Условие правила</Typography>
+                        <Typography variant="body2">{stringifyValue(caseViewData.ruleCondition)}</Typography>
+                      </Grid>
+                      <Grid size={{ xs: 12 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Результаты выявления риска
+                        </Typography>
+                        <Paper sx={{ p: 1.5, bgcolor: 'grey.50' }}>
+                          <Grid container spacing={1.5}>
+                            <Grid size={{ xs: 12 }}>
+                              <Typography variant="caption" color="text.secondary">Заголовок</Typography>
+                              <Typography variant="body2">
+                                {stringifyValue((caseViewData.details as Record<string, unknown> | undefined)?.title)}
+                              </Typography>
+                            </Grid>
+                            <Grid size={{ xs: 12 }}>
+                              <Typography variant="caption" color="text.secondary">Критичность риска</Typography>
+                              <Typography variant="body2">
+                                {getRiskSeverityLabel(
+                                  stringifyValue(
+                                    (caseViewData.details as Record<string, unknown> | undefined)?.severity
+                                  )
+                                )}
+                              </Typography>
+                            </Grid>
+                            <Grid size={{ xs: 12 }}>
+                              <Typography variant="caption" color="text.secondary">Описание</Typography>
+                              <Typography variant="body2">
+                                {stringifyValue(
+                                  (caseViewData.details as Record<string, unknown> | undefined)?.description
+                                )}
+                              </Typography>
+                            </Grid>
+                            <Grid size={{ xs: 12 }}>
+                              <Typography variant="caption" color="text.secondary">Рекомендация</Typography>
+                              <Typography variant="body2">
+                                {stringifyValue(
+                                  (caseViewData.details as Record<string, unknown> | undefined)?.recommendation
+                                )}
+                              </Typography>
+                            </Grid>
+                          </Grid>
+                        </Paper>
+                      </Grid>
+                    </Grid>
+                  </>
+                )}
+
                 {selectedCase.investigationNotes && (
                   <>
                     <Divider sx={{ my: 2 }} />
@@ -775,112 +971,213 @@ export const SupervisorCasesPage: FC = observer(() => {
                   </>
                 )}
 
-                {comments.length > 0 && (
-                  <>
-                    <Divider sx={{ my: 2 }} />
-                    <Typography variant="subtitle2" gutterBottom>
-                      Комментарии ({comments.length})
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle2" gutterBottom>
+                  Комментарии
+                  {!commentsLoading && comments.length > 0 ? ` (${comments.length})` : ''}
+                </Typography>
+                {commentsLoading ? (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 1,
+                      py: 3,
+                    }}
+                  >
+                    <CircularProgress size={32} />
+                    <Typography variant="body2" color="text.secondary">
+                      Загрузка комментариев…
                     </Typography>
-                    <List dense>
-                      {comments.slice(0, 3).map((comment) => (
-                        <ListItem key={comment.id}>
-                          <ListItemAvatar>
-                            <Avatar sx={{ width: 32, height: 32 }}>
-                              {comment.authorName.charAt(0)}
-                            </Avatar>
-                          </ListItemAvatar>
-                          <ListItemText
-                            primary={comment.authorName}
-                            secondary={
-                              <>
-                                <Typography variant="body2" component="span">
-                                  {comment.content}
-                                </Typography>
-                                <Typography variant="caption" display="block" color="text.secondary">
-                                  {new Date(comment.createdAt).toLocaleString('ru-RU')}
-                                </Typography>
-                              </>
-                            }
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </>
+                  </Box>
+                ) : comments.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    Нет комментариев
+                  </Typography>
+                ) : (
+                  <List dense>
+                    {comments.slice(0, 3).map((comment) => (
+                      <ListItem key={comment.id}>
+                        <ListItemAvatar>
+                          <Avatar sx={{ width: 32, height: 32 }}>
+                            {(comment.authorName || '?').charAt(0)}
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={comment.authorName || 'Неизвестный автор'}
+                          secondary={
+                            <>
+                              <Typography variant="body2" component="span">
+                                {comment.content}
+                              </Typography>
+                              <Typography variant="caption" display="block" color="text.secondary">
+                                {comment.createdAt
+                                  ? new Date(comment.createdAt).toLocaleString('ru-RU')
+                                  : '-'}
+                              </Typography>
+                            </>
+                          }
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
                 )}
 
-                {attachments.length > 0 && (
-                  <>
-                    <Divider sx={{ my: 2 }} />
-                    <Typography variant="subtitle2" gutterBottom>
-                      Вложения ({attachments.length})
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle2" gutterBottom>
+                  Вложения
+                  {!attachmentsLoading && attachments.length > 0 ? ` (${attachments.length})` : ''}
+                </Typography>
+                {attachmentsLoading ? (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 1,
+                      py: 3,
+                    }}
+                  >
+                    <CircularProgress size={32} />
+                    <Typography variant="body2" color="text.secondary">
+                      Загрузка вложений…
                     </Typography>
-                    <List dense>
-                      {attachments.map((att) => (
-                        <ListItem key={att.id}>
-                          <ListItemIcon>
-                            <AttachIcon fontSize="small" />
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={att.fileName}
-                            secondary={`${(att.fileSize / 1024).toFixed(2)} KB`}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </>
-                )}
-
-                {verificationHistory.length > 0 && (
-                  <>
-                    <Divider sx={{ my: 2 }} />
-                    <Accordion>
-                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                        <Typography variant="subtitle2">
-                          История верификаций ({verificationHistory.length})
-                        </Typography>
-                      </AccordionSummary>
-                      <AccordionDetails>
-                        <List dense>
-                          {verificationHistory.map((item, index) => (
-                            <ListItem key={index}>
-                              <ListItemIcon>
-                                {item.approved ? (
-                                  <ThumbUpIcon color="success" fontSize="small" />
+                  </Box>
+                ) : attachments.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    Нет вложений
+                  </Typography>
+                ) : (
+                  <List dense>
+                    {attachments.map((att) => (
+                      <ListItem
+                        key={att.id}
+                        secondaryAction={
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={
+                                attachmentDownloadId === att.id ? (
+                                  <CircularProgress size={16} />
+                                ) : undefined
+                              }
+                              onClick={() => void handleDownloadAttachment(att)}
+                              disabled={
+                                attachmentsLoading ||
+                                attachmentDownloadId === att.id ||
+                                attachmentDeleteId === att.id
+                              }
+                            >
+                              Скачать
+                            </Button>
+                            <Button
+                              size="small"
+                              color="error"
+                              variant="outlined"
+                              startIcon={
+                                attachmentDeleteId === att.id ? (
+                                  <CircularProgress size={16} color="inherit" />
                                 ) : (
-                                  <ThumbDownIcon color="error" fontSize="small" />
-                                )}
-                              </ListItemIcon>
-                              <ListItemText
-                                primary={item.approved ? 'Утверждено' : 'Отклонено'}
-                                secondary={
-                                  <>
-                                    <Typography variant="caption" display="block">
-                                      {item.verifiedBy} • {new Date(item.verifiedAt).toLocaleString('ru-RU')}
-                                    </Typography>
-                                    {item.comments && (
-                                      <Typography variant="caption">{item.comments}</Typography>
-                                    )}
-                                  </>
-                                }
-                              />
-                            </ListItem>
-                          ))}
-                        </List>
-                      </AccordionDetails>
-                    </Accordion>
-                  </>
+                                  <DeleteOutlineIcon />
+                                )
+                              }
+                              onClick={() => void handleDeleteAttachment(att)}
+                              disabled={
+                                attachmentsLoading ||
+                                attachmentDownloadId === att.id ||
+                                attachmentDeleteId === att.id
+                              }
+                            >
+                              Удалить
+                            </Button>
+                          </Stack>
+                        }
+                      >
+                        <ListItemIcon>
+                          <AttachIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={att.fileName}
+                          secondary={`${(att.fileSize / 1024).toFixed(2)} KB`}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                )}
+
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle2" gutterBottom>
+                  История верификаций
+                </Typography>
+                {verificationHistoryLoading ? (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 1,
+                      py: 3,
+                    }}
+                  >
+                    <CircularProgress size={32} />
+                    <Typography variant="body2" color="text.secondary">
+                      Загрузка истории верификаций…
+                    </Typography>
+                  </Box>
+                ) : verificationHistory.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    Записей истории верификаций нет
+                  </Typography>
+                ) : (
+                  <Accordion>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Typography variant="subtitle2">
+                        Записей: {verificationHistory.length}
+                      </Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      <List dense>
+                        {verificationHistory.map((item, index) => (
+                          <ListItem key={index}>
+                            <ListItemIcon>
+                              {item.approved ? (
+                                <ThumbUpIcon color="success" fontSize="small" />
+                              ) : (
+                                <ThumbDownIcon color="error" fontSize="small" />
+                              )}
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={item.approved ? 'Утверждено' : 'Отклонено'}
+                              secondary={
+                                <>
+                                  <Typography variant="caption" display="block">
+                                    {item.verifiedBy} • {new Date(item.verifiedAt).toLocaleString('ru-RU')}
+                                  </Typography>
+                                  {item.comments && (
+                                    <Typography variant="caption">{item.comments}</Typography>
+                                  )}
+                                </>
+                              }
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    </AccordionDetails>
+                  </Accordion>
                 )}
               </DialogContent>
 
               <DialogActions sx={{ px: 3, pb: 3 }}>
-                <Button onClick={() => setViewDialogOpen(false)}>
+                <Button onClick={handleCloseViewDialog}>
                   Закрыть
                 </Button>
                 {selectedCase.status === 'WAITING_VERIFICATION' && (
                   <Button
                     variant="contained"
                     onClick={() => {
-                      setViewDialogOpen(false);
+                      handleCloseViewDialog();
                       handleOpenVerification(selectedCase);
                     }}
                     startIcon={<AssessmentIcon />}

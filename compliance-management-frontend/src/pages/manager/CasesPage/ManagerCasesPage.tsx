@@ -41,6 +41,7 @@ import {
   InputLabel,
   TextareaAutosize,
   Tooltip,
+  Stack,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -53,6 +54,7 @@ import {
   Check as CheckIcon,
   Warning as WarningIcon,
   Info as InfoIcon,
+  DeleteOutline as DeleteOutlineIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { CaseApi } from '@shared/lib/api/caseApi';
@@ -106,6 +108,12 @@ export const ManagerCasesPage: FC = observer(() => {
   const [requiresAction, setRequiresAction] = useState(false);
   const [responsibleDisplayName, setResponsibleDisplayName] = useState<string>('-');
   const [caseViewData, setCaseViewData] = useState<CaseViewItem | null>(null);
+  const [caseViewLoading, setCaseViewLoading] = useState(false);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+  const [responsibleLoading, setResponsibleLoading] = useState(false);
+  const [attachmentDownloadId, setAttachmentDownloadId] = useState<string | null>(null);
+  const [attachmentDeleteId, setAttachmentDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCases();
@@ -141,6 +149,11 @@ export const ManagerCasesPage: FC = observer(() => {
     setCaseViewData(null);
     setDialogOpen(true);
 
+    setCaseViewLoading(true);
+    setCommentsLoading(true);
+    setAttachmentsLoading(true);
+    setResponsibleLoading(true);
+
     // 1) Сначала загрузить view карточки case
     try {
       const viewData = await CaseApi.getCaseView(caseItem.caseId || caseItem.id);
@@ -155,18 +168,37 @@ export const ManagerCasesPage: FC = observer(() => {
     } catch (viewError) {
       console.error('Failed to load cases view data:', viewError);
       setCaseViewData(null);
+    } finally {
+      setCaseViewLoading(false);
     }
 
-    // После view догружаем комментарии и вложения
+    // После view догружаем комментарии и вложения (независимо, чтобы ошибка одного не скрывала другой)
+    const resolvedCaseId = caseItem.caseId || caseItem.id;
+    setComments([]);
+    setAttachments([]);
+
     try {
-      const [commentsData, attachmentsData] = await Promise.all([
-        CaseApi.getCaseComments(caseItem.id),
-        CaseApi.getCaseAttachments(caseItem.id),
+      const [commentsOutcome, attachmentsOutcome] = await Promise.allSettled([
+        CaseApi.getCaseComments(resolvedCaseId),
+        CaseApi.getCaseAttachments(resolvedCaseId),
       ]);
-      setComments(commentsData);
-      setAttachments(attachmentsData);
-    } catch (error) {
-      console.error('Failed to load case details:', error);
+
+      if (commentsOutcome.status === 'fulfilled') {
+        setComments(commentsOutcome.value);
+      } else {
+        console.error('Failed to load case comments:', commentsOutcome.reason);
+        setComments([]);
+      }
+
+      if (attachmentsOutcome.status === 'fulfilled') {
+        setAttachments(attachmentsOutcome.value);
+      } else {
+        console.error('Failed to load case attachments:', attachmentsOutcome.reason);
+        setAttachments([]);
+      }
+    } finally {
+      setCommentsLoading(false);
+      setAttachmentsLoading(false);
     }
 
     // Определить ответственного как в окне инцидента:
@@ -186,6 +218,8 @@ export const ManagerCasesPage: FC = observer(() => {
     } catch (responsibleError) {
       console.error('Failed to load responsible user for case:', responsibleError);
       setResponsibleDisplayName(caseItem.ownerName || '-');
+    } finally {
+      setResponsibleLoading(false);
     }
   };
 
@@ -198,13 +232,22 @@ export const ManagerCasesPage: FC = observer(() => {
     setNewComment('');
     setResponsibleDisplayName('-');
     setCaseViewData(null);
+    setCaseViewLoading(false);
+    setCommentsLoading(false);
+    setAttachmentsLoading(false);
+    setResponsibleLoading(false);
+    setAttachmentDownloadId(null);
+    setAttachmentDeleteId(null);
   };
 
   const handleAddComment = async () => {
     if (!selectedCase || !newComment.trim()) return;
     
     try {
-      const comment = await CaseApi.addCaseComment(selectedCase.id, newComment);
+      const comment = await CaseApi.addCaseComment(
+        selectedCase.caseId || selectedCase.id,
+        newComment
+      );
       setComments([...comments, comment]);
       setNewComment('');
     } catch (error) {
@@ -217,10 +260,40 @@ export const ManagerCasesPage: FC = observer(() => {
     
     const file = event.target.files[0];
     try {
-      const attachment = await CaseApi.uploadCaseAttachment(selectedCase.id, file);
+      const attachment = await CaseApi.uploadCaseAttachment(
+        selectedCase.caseId || selectedCase.id,
+        file
+      );
       setAttachments([...attachments, attachment]);
     } catch (error) {
       console.error('Failed to upload file:', error);
+    }
+  };
+
+  const handleDownloadAttachment = async (attachment: CaseAttachment) => {
+    if (!selectedCase?.id) return;
+    const caseId = selectedCase.caseId || selectedCase.id;
+    setAttachmentDownloadId(attachment.id);
+    try {
+      await CaseApi.downloadCaseAttachment(caseId, attachment.id, attachment.fileName);
+    } catch (error) {
+      console.error('Failed to download attachment:', error);
+    } finally {
+      setAttachmentDownloadId(null);
+    }
+  };
+
+  const handleDeleteAttachment = async (attachment: CaseAttachment) => {
+    if (!selectedCase?.id) return;
+    const caseId = selectedCase.caseId || selectedCase.id;
+    setAttachmentDeleteId(attachment.id);
+    try {
+      await CaseApi.deleteCaseAttachment(caseId, attachment.id);
+      setAttachments((prev) => prev.filter((a) => a.id !== attachment.id));
+    } catch (error) {
+      console.error('Failed to delete attachment:', error);
+    } finally {
+      setAttachmentDeleteId(null);
     }
   };
 
@@ -257,7 +330,10 @@ export const ManagerCasesPage: FC = observer(() => {
     if (!selectedCase) return;
     
     try {
-      await CaseApi.closeCase(selectedCase.id, rootCause || 'Расследование завершено');
+      await CaseApi.closeCase(
+        selectedCase.caseId || selectedCase.id,
+        rootCause || 'Расследование завершено'
+      );
       await loadCases();
       handleCloseDialog();
     } catch (error) {
@@ -539,8 +615,32 @@ export const ManagerCasesPage: FC = observer(() => {
               >
                 <Tab label="Описание" />
                 <Tab label="Расследование" />
-                <Tab label="Комментарии" icon={<Chip label={comments.length} size="small" />} iconPosition="end" />
-                <Tab label="Вложения" icon={<Chip label={attachments.length} size="small" />} iconPosition="end" />
+                <Tab
+                  label="Комментарии"
+                  icon={
+                    commentsLoading ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 28, justifyContent: 'center' }}>
+                        <CircularProgress size={14} thickness={5} />
+                      </Box>
+                    ) : (
+                      <Chip label={comments.length} size="small" />
+                    )
+                  }
+                  iconPosition="end"
+                />
+                <Tab
+                  label="Вложения"
+                  icon={
+                    attachmentsLoading ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 28, justifyContent: 'center' }}>
+                        <CircularProgress size={14} thickness={5} />
+                      </Box>
+                    ) : (
+                      <Chip label={attachments.length} size="small" />
+                    )
+                  }
+                  iconPosition="end"
+                />
               </Tabs>
 
               <DialogContent>
@@ -565,7 +665,12 @@ export const ManagerCasesPage: FC = observer(() => {
                     </Grid>
                     <Grid size={{xs: 6}}>
                       <Typography variant="caption" color="text.secondary">Ответственный</Typography>
-                      <Typography variant="body2">{responsibleDisplayName}</Typography>
+                      <Box sx={{ minHeight: 24, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {responsibleLoading && <CircularProgress size={18} />}
+                        {!responsibleLoading && (
+                          <Typography variant="body2">{responsibleDisplayName}</Typography>
+                        )}
+                      </Box>
                     </Grid>
                     <Grid size={{xs: 6}}>
                       <Typography variant="caption" color="text.secondary">Связанные инциденты</Typography>
@@ -573,7 +678,27 @@ export const ManagerCasesPage: FC = observer(() => {
                     </Grid>
                   </Grid>
 
-                  {caseViewData && (
+                  {caseViewLoading && (
+                    <>
+                      <Divider sx={{ my: 2 }} />
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 1,
+                          py: 4,
+                        }}
+                      >
+                        <CircularProgress size={36} />
+                        <Typography variant="body2" color="text.secondary">
+                          Загрузка данных правила…
+                        </Typography>
+                      </Box>
+                    </>
+                  )}
+                  {!caseViewLoading && caseViewData && (
                     <>
                       <Divider sx={{ my: 2 }} />
                       <Typography variant="subtitle2" gutterBottom>
@@ -657,7 +782,15 @@ export const ManagerCasesPage: FC = observer(() => {
                     </Alert>
                   )}
 
-                  {caseViewData?.updatedAt && (
+                  {caseViewLoading && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                      <CircularProgress size={22} />
+                      <Typography variant="body2" color="text.secondary">
+                        Загрузка сведений о расследовании…
+                      </Typography>
+                    </Box>
+                  )}
+                  {!caseViewLoading && caseViewData?.updatedAt && (
                     <Paper sx={{ p: 2, mb: 2, bgcolor: 'grey.50' }}>
                       <Typography variant="caption" color="text.secondary">Обновлено</Typography>
                       <Typography variant="body2">
@@ -681,7 +814,7 @@ export const ManagerCasesPage: FC = observer(() => {
                     onChange={(e) => setInvestigationNotes(e.target.value)}
                     placeholder="Опишите ход расследования, найденные факты и промежуточные выводы..."
                     sx={{ mb: 3 }}
-                    disabled={!isInvestigationEditable}
+                    disabled={!isInvestigationEditable || caseViewLoading}
                   />
 
                   <TextField
@@ -693,7 +826,7 @@ export const ManagerCasesPage: FC = observer(() => {
                     onChange={(e) => setRootCause(e.target.value)}
                     placeholder="Укажите выявленную первопричину нарушения..."
                     sx={{ mb: 3 }}
-                    disabled={!isInvestigationEditable}
+                    disabled={!isInvestigationEditable || caseViewLoading}
                   />
 
                   <FormControl fullWidth sx={{ mb: 3 }}>
@@ -702,7 +835,7 @@ export const ManagerCasesPage: FC = observer(() => {
                       value={requiresAction ? 'yes' : 'no'}
                       onChange={(e) => setRequiresAction(e.target.value === 'yes')}
                       label="Требуются корректирующие действия?"
-                    disabled={!isInvestigationEditable}
+                    disabled={!isInvestigationEditable || caseViewLoading}
                     >
                       <MenuItem value="no">Нет, закрыть случай</MenuItem>
                       <MenuItem value="yes">Да, создать план действий</MenuItem>
@@ -720,31 +853,51 @@ export const ManagerCasesPage: FC = observer(() => {
 
                 {/* Вкладка "Комментарии" */}
                 <TabPanel value={tabValue} index={2}>
-                  <List>
-                    {comments.map((comment) => (
-                      <Box key={comment.id}>
-                        <ListItem alignItems="flex-start">
-                          <ListItemAvatar>
-                            <Avatar>{comment.authorName.charAt(0)}</Avatar>
-                          </ListItemAvatar>
-                          <ListItemText
-                            primary={comment.authorName}
-                            secondary={
-                              <>
-                                <Typography variant="body2" component="span" sx={{ display: 'block', mt: 1 }}>
-                                  {comment.content}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {new Date(comment.createdAt).toLocaleString('ru-RU')}
-                                </Typography>
-                              </>
-                            }
-                          />
-                        </ListItem>
-                        <Divider variant="inset" component="li" />
-                      </Box>
-                    ))}
-                  </List>
+                  {commentsLoading ? (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 1,
+                        py: 6,
+                      }}
+                    >
+                      <CircularProgress />
+                      <Typography variant="body2" color="text.secondary">
+                        Загрузка комментариев…
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <List>
+                      {comments.map((comment) => (
+                        <Box key={comment.id}>
+                          <ListItem alignItems="flex-start">
+                            <ListItemAvatar>
+                              <Avatar>{(comment.authorName || '?').charAt(0)}</Avatar>
+                            </ListItemAvatar>
+                            <ListItemText
+                              primary={comment.authorName || 'Неизвестный автор'}
+                              secondary={
+                                <>
+                                  <Typography variant="body2" component="span" sx={{ display: 'block', mt: 1 }}>
+                                    {comment.content}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {comment.createdAt
+                                      ? new Date(comment.createdAt).toLocaleString('ru-RU')
+                                      : '-'}
+                                  </Typography>
+                                </>
+                              }
+                            />
+                          </ListItem>
+                          <Divider variant="inset" component="li" />
+                        </Box>
+                      ))}
+                    </List>
+                  )}
 
                   <Box sx={{ mt: 3, display: 'flex', gap: 1 }}>
                     <TextField
@@ -754,11 +907,12 @@ export const ManagerCasesPage: FC = observer(() => {
                       onChange={(e) => setNewComment(e.target.value)}
                       multiline
                       maxRows={3}
+                      disabled={commentsLoading}
                     />
                     <Button
                       variant="contained"
                       onClick={handleAddComment}
-                      disabled={!newComment.trim()}
+                      disabled={commentsLoading || !newComment.trim()}
                     >
                       <CommentIcon />
                     </Button>
@@ -767,34 +921,92 @@ export const ManagerCasesPage: FC = observer(() => {
 
                 {/* Вкладка "Вложения" */}
                 <TabPanel value={tabValue} index={3}>
-                  <List>
-                    {attachments.map((attachment) => (
-                      <ListItem key={attachment.id}>
-                        <ListItemAvatar>
-                          <Avatar>
-                            <AttachIcon />
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={attachment.fileName}
-                          secondary={
-                            <>
-                              <Typography variant="caption" component="span">
-                                {(attachment.fileSize / 1024).toFixed(2)} KB • {attachment.fileType}
-                              </Typography>
-                              <br />
-                              <Typography variant="caption" color="text.secondary">
-                                {new Date(attachment.uploadedAt).toLocaleString('ru-RU')}
-                              </Typography>
-                            </>
+                  {attachmentsLoading ? (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 1,
+                        py: 6,
+                      }}
+                    >
+                      <CircularProgress />
+                      <Typography variant="body2" color="text.secondary">
+                        Загрузка вложений…
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <List>
+                      {attachments.map((attachment) => (
+                        <ListItem
+                          key={attachment.id}
+                          secondaryAction={
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={
+                                  attachmentDownloadId === attachment.id ? (
+                                    <CircularProgress size={16} />
+                                  ) : undefined
+                                }
+                                onClick={() => void handleDownloadAttachment(attachment)}
+                                disabled={
+                                  attachmentsLoading ||
+                                  attachmentDownloadId === attachment.id ||
+                                  attachmentDeleteId === attachment.id
+                                }
+                              >
+                                Скачать
+                              </Button>
+                              <Button
+                                size="small"
+                                color="error"
+                                variant="outlined"
+                                startIcon={
+                                  attachmentDeleteId === attachment.id ? (
+                                    <CircularProgress size={16} color="inherit" />
+                                  ) : (
+                                    <DeleteOutlineIcon />
+                                  )
+                                }
+                                onClick={() => void handleDeleteAttachment(attachment)}
+                                disabled={
+                                  attachmentsLoading ||
+                                  attachmentDownloadId === attachment.id ||
+                                  attachmentDeleteId === attachment.id
+                                }
+                              >
+                                Удалить
+                              </Button>
+                            </Stack>
                           }
-                        />
-                        <Button size="small" href={attachment.fileUrl} target="_blank">
-                          Скачать
-                        </Button>
-                      </ListItem>
-                    ))}
-                  </List>
+                        >
+                          <ListItemAvatar>
+                            <Avatar>
+                              <AttachIcon />
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText
+                            primary={attachment.fileName}
+                            secondary={
+                              <>
+                                <Typography variant="caption" component="span">
+                                  {(attachment.fileSize / 1024).toFixed(2)} KB • {attachment.fileType}
+                                </Typography>
+                                <br />
+                                <Typography variant="caption" color="text.secondary">
+                                  {new Date(attachment.uploadedAt).toLocaleString('ru-RU')}
+                                </Typography>
+                              </>
+                            }
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  )}
 
                   <Button
                     variant="outlined"
@@ -802,9 +1014,10 @@ export const ManagerCasesPage: FC = observer(() => {
                     startIcon={<AttachIcon />}
                     fullWidth
                     sx={{ mt: 2 }}
+                    disabled={attachmentsLoading}
                   >
                     Загрузить файл
-                    <input type="file" hidden onChange={handleFileUpload} />
+                    <input type="file" hidden onChange={handleFileUpload} disabled={attachmentsLoading} />
                   </Button>
                 </TabPanel>
               </DialogContent>

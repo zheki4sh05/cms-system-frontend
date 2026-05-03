@@ -1,5 +1,7 @@
 import { CasePriority, CaseSeverity, CaseStatus, type Case, type CaseAttachment, type CaseComment, type CaseVerificationDetails, type CreateCaseRequest, type UpdateCaseRequest, type UpdateInvestigationRequest, type VerificationDecision } from "@shared/types/caseTypes";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+/** База для маршрутов вида /api/cases/... (без суффикса /api/v1), как в apiClient при url.startsWith('/api/'). */
+const CASES_LEGACY_API_BASE = `${API_BASE_URL.replace(/\/api\/v1\/?$/, '')}/api`;
 import { http, HttpResponse, delay } from 'msw';
 // Добавить моковые данные для верификации
 const mockVerificationDetails: Record<string, CaseVerificationDetails> = {
@@ -574,6 +576,48 @@ export const casesHandlers = [
     mockAttachments.push(newAttachment);
     return HttpResponse.json(newAttachment, { status: 201 });
   }),
+
+  // GET /api/cases/:caseId/attachments/:attachmentId/download
+  http.get(
+    `${CASES_LEGACY_API_BASE}/cases/:caseId/attachments/:attachmentId/download`,
+    async ({ params }) => {
+      await delay(200);
+      const { caseId, attachmentId } = params;
+      const att = mockAttachments.find(
+        (a) => a.caseId === caseId && a.id === attachmentId
+      );
+      if (!att) {
+        return HttpResponse.json({ message: 'Вложение не найдено' }, { status: 404 });
+      }
+      const blob = new Blob([`Mock: ${att.fileName}`], {
+        type: att.fileType || 'application/octet-stream',
+      });
+      return new HttpResponse(blob, {
+        status: 200,
+        headers: {
+          'Content-Type': att.fileType || 'application/octet-stream',
+          'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(att.fileName)}`,
+        },
+      });
+    }
+  ),
+
+  // DELETE /api/cases/:caseId/attachments/:attachmentId
+  http.delete(
+    `${CASES_LEGACY_API_BASE}/cases/:caseId/attachments/:attachmentId`,
+    async ({ params }) => {
+      await delay(200);
+      const { caseId, attachmentId } = params;
+      const idx = mockAttachments.findIndex(
+        (a) => a.caseId === caseId && a.id === attachmentId
+      );
+      if (idx === -1) {
+        return HttpResponse.json({ message: 'Вложение не найдено' }, { status: 404 });
+      }
+      mockAttachments.splice(idx, 1);
+      return new HttpResponse(null, { status: 204 });
+    }
+  ),
 
   // GET /cases/:caseId/verification-details - Получить детали для верификации
   http.get(`${API_BASE_URL}/cases/:caseId/verification-details`, async ({ params }) => {
