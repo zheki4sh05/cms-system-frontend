@@ -15,13 +15,10 @@ import { ManagerTasksPage } from '@pages/manager/TasksPage/ManagerTasksPage';
 
 // Supervisor pages
 import { SupervisorDashboardPage } from '@pages/supervisor/DashboardPage/DashBoardPage';
-import { SupervisorCasesPage } from '@pages/supervisor/CasesPage/SupervisorCasesPage';
-import { SupervisorIncidentsPage } from '@pages/supervisor/IncidentsPage/SupervisorIncidentsPage';
 import { SupervisorAnalyticsPage } from '@pages/supervisor/AnalyticsPage/SuperVisorAnalyticsPage';
 
 // Executive pages
 import { ExecutiveDashboardPage } from '@pages/executive/DashboardPage/ExecutiveDashboardPage';
-import { ExecutiveReportsPage } from '@pages/executive/ReportsPage/ExecutiveReportsPage';
 
 // Other
 import { NotFoundPage } from '@pages/NotFoundPage/NotFoundPage';
@@ -35,6 +32,7 @@ import { SupervisorHelpPage } from '@pages/help/SuperVisorHelpPage';
 import { ExecutiveHelpPage } from '@pages/help/ExecutiveHelpPage';
 import { ManagerRulesPage } from '@pages/manager/RulesPage/RulesPage';
 import { ArchivePage } from '@pages/archive/ArchivePage';
+import { IncidentsAndCasesPage } from '@pages/shared/IncidentsAndCasesPage/IncidentsAndCasesPage';
 
 export const RouterProvider: FC = observer(() => {
   return (
@@ -74,8 +72,9 @@ export const RouterProvider: FC = observer(() => {
                 <Routes>
                    <Route index element={<Navigate to="dashboard" replace />} />
                   <Route path="dashboard" element={<SupervisorDashboardPage />} />
-                  <Route path="cases" element={<SupervisorCasesPage />} />
-                  <Route path="incidents" element={<SupervisorIncidentsPage />} />
+                  <Route path="incidents-cases" element={<IncidentsAndCasesPage />} />
+                  <Route path="cases" element={<Navigate to="../incidents-cases" replace />} />
+                  <Route path="incidents" element={<Navigate to="../incidents-cases" replace />} />
                   <Route path="analytics" element={<SupervisorAnalyticsPage />} />
                   <Route path="archive" element={<ArchivePage />} />
                   <Route path="rules" element={<SupervisorRulesPage />} />
@@ -94,7 +93,8 @@ export const RouterProvider: FC = observer(() => {
               <AppLayout>
                 <Routes>
                   <Route path="dashboard" element={<ExecutiveDashboardPage />} />
-                  <Route path="reports" element={<ExecutiveReportsPage />} />
+                  <Route path="incidents-cases" element={<IncidentsAndCasesPage />} />
+                  <Route path="reports" element={<Navigate to="../incidents-cases" replace />} />
                   <Route path="archive" element={<ArchivePage />} />
                   <Route path="help" element={<ExecutiveHelpPage />} />
                 </Routes>

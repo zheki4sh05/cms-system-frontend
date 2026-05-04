@@ -15,10 +15,20 @@ import type {
   IncidentViewDto,
   UserBasicInfo,
   AssignToMeResponse,
+  IncidentReportsPageResult,
+  IncidentReportItem,
+  IncidentReportFinding,
+  IncidentReportCase,
 } from '@shared/types/incidentTypes';
 import type { Case } from '@shared/types/caseTypes';
 
 export class IncidentApi {
+  private static stringifyUnknown(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return '';
+  }
+
   private static normalizeStatus(status: unknown): Incident['status'] {
     if (typeof status !== 'string') return 'NEW';
     const upper = status.toUpperCase();
@@ -259,5 +269,194 @@ export class IncidentApi {
       `/incidents/${incidentId}/assignment-history`
     );
     return response.data;
+  }
+
+  private static normalizeReportCase(raw: unknown): IncidentReportCase {
+    if (!raw || typeof raw !== 'object') {
+      return {
+        id: '',
+        incidentId: '',
+        findingId: '',
+        status: 'UNKNOWN',
+        comments: [],
+        attachments: [],
+      };
+    }
+    const value = raw as Record<string, unknown>;
+    const comments = Array.isArray(value.comments) ? value.comments : [];
+    const attachments = Array.isArray(value.attachments) ? value.attachments : [];
+    const actionPlanRaw = value.actionPlan;
+    const actionPlan =
+      actionPlanRaw && typeof actionPlanRaw === 'object'
+        ? {
+            id: this.stringifyUnknown((actionPlanRaw as Record<string, unknown>).id),
+            incidentId: this.stringifyUnknown((actionPlanRaw as Record<string, unknown>).incidentId),
+            caseId: this.stringifyUnknown((actionPlanRaw as Record<string, unknown>).caseId),
+            title: (actionPlanRaw as Record<string, unknown>).title,
+            description: (actionPlanRaw as Record<string, unknown>).description,
+            comment: (actionPlanRaw as Record<string, unknown>).comment,
+            verification:
+              (actionPlanRaw as Record<string, unknown>).verification &&
+              typeof (actionPlanRaw as Record<string, unknown>).verification === 'object'
+                ? {
+                    id: this.stringifyUnknown(
+                      ((actionPlanRaw as Record<string, unknown>).verification as Record<string, unknown>).id
+                    ),
+                    actionPlanId: this.stringifyUnknown(
+                      ((actionPlanRaw as Record<string, unknown>).verification as Record<string, unknown>)
+                        .actionPlanId
+                    ),
+                    verified: Boolean(
+                      ((actionPlanRaw as Record<string, unknown>).verification as Record<string, unknown>).verified
+                    ),
+                    assignedUserForVerification: this.stringifyUnknown(
+                      ((actionPlanRaw as Record<string, unknown>).verification as Record<string, unknown>)
+                        .assignedUserForVerification
+                    ),
+                    assignedEmployeeForVerification: this.stringifyUnknown(
+                      ((actionPlanRaw as Record<string, unknown>).verification as Record<string, unknown>)
+                        .assignedEmployeeForVerification
+                    ),
+                    comments:
+                      ((actionPlanRaw as Record<string, unknown>).verification as Record<string, unknown>).comments,
+                  }
+                : undefined,
+            tasks: Array.isArray((actionPlanRaw as Record<string, unknown>).tasks)
+              ? ((actionPlanRaw as Record<string, unknown>).tasks as unknown[]).map((task) => {
+                  const taskValue = (task ?? {}) as Record<string, unknown>;
+                  return {
+                    id: this.stringifyUnknown(taskValue.id),
+                    title: this.stringifyUnknown(taskValue.title),
+                    description: this.stringifyUnknown(taskValue.description),
+                    priority: this.stringifyUnknown(taskValue.priority),
+                    dueDate: this.stringifyUnknown(taskValue.dueDate),
+                    status: this.stringifyUnknown(taskValue.status),
+                    evidenceDescriptionInprogress: taskValue.evidenceDescriptionInprogress,
+                    evidenceDescriptionDone: taskValue.evidenceDescriptionDone,
+                    completedAt: taskValue.completedAt,
+                    evidences: Array.isArray(taskValue.evidences)
+                      ? (taskValue.evidences as unknown[]).map((evidence) => {
+                          const evidenceValue = (evidence ?? {}) as Record<string, unknown>;
+                          return {
+                            id: this.stringifyUnknown(evidenceValue.id),
+                            userId: this.stringifyUnknown(evidenceValue.userId),
+                            fileId: this.stringifyUnknown(evidenceValue.fileId),
+                            name: this.stringifyUnknown(evidenceValue.name),
+                            time: this.stringifyUnknown(evidenceValue.time),
+                          };
+                        })
+                      : [],
+                  };
+                })
+              : [],
+          }
+        : undefined;
+
+    return {
+      id: this.stringifyUnknown(value.id),
+      incidentId: this.stringifyUnknown(value.incidentId),
+      findingId: this.stringifyUnknown(value.findingId),
+      assignedUserId: value.assignedUserId,
+      status: this.stringifyUnknown(value.status) || 'UNKNOWN',
+      investigation:
+        value.investigation && typeof value.investigation === 'object'
+          ? {
+              id: this.stringifyUnknown((value.investigation as Record<string, unknown>).id),
+              caseId: this.stringifyUnknown((value.investigation as Record<string, unknown>).caseId),
+              investigationNotes: this.stringifyUnknown(
+                (value.investigation as Record<string, unknown>).investigationNotes
+              ),
+              rootCause: this.stringifyUnknown((value.investigation as Record<string, unknown>).rootCause),
+              requiresCorrectiveAction: Boolean(
+                (value.investigation as Record<string, unknown>).requiresCorrectiveAction
+              ),
+              createdAt: this.stringifyUnknown((value.investigation as Record<string, unknown>).createdAt),
+              updatedAt: this.stringifyUnknown((value.investigation as Record<string, unknown>).updatedAt),
+            }
+          : undefined,
+      comments: comments.map((comment) => {
+        const commentValue = (comment ?? {}) as Record<string, unknown>;
+        return {
+          id: this.stringifyUnknown(commentValue.id),
+          userId: this.stringifyUnknown(commentValue.userId),
+          comment: this.stringifyUnknown(commentValue.comment),
+          time: this.stringifyUnknown(commentValue.time),
+        };
+      }),
+      attachments: attachments.map((attachment) => {
+        const attachmentValue = (attachment ?? {}) as Record<string, unknown>;
+        return {
+          id: this.stringifyUnknown(attachmentValue.id),
+          userId: this.stringifyUnknown(attachmentValue.userId),
+          fileId: this.stringifyUnknown(attachmentValue.fileId),
+          name: this.stringifyUnknown(attachmentValue.name),
+          size: typeof attachmentValue.size === 'number' ? attachmentValue.size : 0,
+          time: this.stringifyUnknown(attachmentValue.time),
+        };
+      }),
+      actionPlan,
+    };
+  }
+
+  private static normalizeReportFinding(raw: unknown): IncidentReportFinding {
+    if (!raw || typeof raw !== 'object') {
+      return {
+        id: '',
+        priority: '',
+        assignedUserId: undefined,
+        ruleName: undefined,
+        details: {},
+        cases: [],
+      };
+    }
+    const value = raw as Record<string, unknown>;
+    return {
+      id: this.stringifyUnknown(value.id),
+      priority: this.stringifyUnknown(value.priority),
+      assignedUserId: value.assignedUserId,
+      ruleName: value.ruleName,
+      details: value.details && typeof value.details === 'object' ? (value.details as Record<string, unknown>) : {},
+      cases: Array.isArray(value.cases) ? value.cases.map((caseItem) => this.normalizeReportCase(caseItem)) : [],
+    };
+  }
+
+  private static normalizeReportItem(raw: unknown): IncidentReportItem {
+    const value = (raw ?? {}) as Record<string, unknown>;
+    const incidentValue =
+      value.incident && typeof value.incident === 'object'
+        ? (value.incident as Record<string, unknown>)
+        : {};
+    return {
+      incident: {
+        id: this.stringifyUnknown(incidentValue.id),
+        companyId: this.stringifyUnknown(incidentValue.companyId),
+        integrationId: typeof incidentValue.integrationId === 'number' ? incidentValue.integrationId : 0,
+        riskObjectId: this.stringifyUnknown(incidentValue.riskObjectId),
+        riskObjectName: incidentValue.riskObjectName,
+        documentId: incidentValue.documentId,
+        integrationName: incidentValue.integrationName,
+        status: this.stringifyUnknown(incidentValue.status) || 'UNKNOWN',
+      },
+      findings: Array.isArray(value.findings)
+        ? value.findings.map((finding) => this.normalizeReportFinding(finding))
+        : [],
+    };
+  }
+
+  static async getIncidentReports(page: number, limit: number): Promise<IncidentReportsPageResult> {
+    const response = await apiClient.get<unknown>('/api/incidents/reports', {
+      params: { page, limit },
+    });
+    const payload = (response.data ?? {}) as Record<string, unknown>;
+    const items = Array.isArray(payload.items)
+      ? payload.items.map((item) => this.normalizeReportItem(item))
+      : [];
+    return {
+      items,
+      page: typeof payload.page === 'number' ? payload.page : page,
+      limit: typeof payload.limit === 'number' ? payload.limit : limit,
+      total: typeof payload.total === 'number' ? payload.total : items.length,
+      totalPages: typeof payload.totalPages === 'number' ? payload.totalPages : 0,
+    };
   }
 }

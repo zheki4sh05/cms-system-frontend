@@ -309,8 +309,23 @@ export class TaskApi {
    * Отправить план на утверждение (POST /api/action-plans/{planId}/submit)
    */
   static async submitForVerification(planId: string): Promise<SubmitActionPlanResponse> {
+    const storedUser = localStorage.getItem('user');
+    let employeeId: string | null = null;
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser) as { employeeId?: string };
+        employeeId = parsedUser.employeeId?.trim() ?? null;
+      } catch (error) {
+        console.error('Failed to parse user data for EmployeeId header:', error);
+      }
+    }
+
     const response = await apiClient.post<SubmitActionPlanResponse>(
-      `/api/action-plans/${planId}/submit`
+      `/api/action-plans/${planId}/submit`,
+      undefined,
+      {
+        headers: employeeId ? { EmployeeId: employeeId } : undefined,
+      }
     );
     return response.data;
   }

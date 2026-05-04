@@ -9,14 +9,13 @@ export const ROUTES = {
   },
   SUPERVISOR: {
     DASHBOARD: '/supervisor/dashboard',
-    CASES: '/supervisor/cases',
-    INCIDENTS: '/supervisor/incidents',
+    INCIDENTS_CASES: '/supervisor/incidents-cases',
     ANALYTICS: '/supervisor/analytics',
     ARCHIVE: '/supervisor/archive',
   },
   EXECUTIVE: {
     DASHBOARD: '/executive/dashboard',
-    REPORTS: '/executive/reports',
+    INCIDENTS_CASES: '/executive/incidents-cases',
     ARCHIVE: '/executive/archive',
   },
 } as const;

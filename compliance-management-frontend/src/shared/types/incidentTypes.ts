@@ -123,7 +123,7 @@ export interface Incident {
   // Источник данных
   sourceSystem: string; // ERP, CRM, 1C и т.д.
   sourceEventId: string;
-  payloadJson?: any; // Исходные данные события
+  payloadJson?: unknown; // Исходные данные события
   
   // Дополнительная информация
   vendorId?: string;
@@ -233,4 +233,108 @@ export interface AssignToMeResponse {
     createdAt: string;
     updatedAt: string;
   };
+}
+
+export interface IncidentReportTaskEvidence {
+  id: string;
+  userId: string;
+  fileId: string;
+  name: string;
+  time: string;
+}
+
+export interface IncidentReportTask {
+  id: string;
+  title: string;
+  description: string;
+  priority: string;
+  dueDate: string;
+  status: string;
+  evidenceDescriptionInprogress?: unknown;
+  evidenceDescriptionDone?: unknown;
+  completedAt?: unknown;
+  evidences: IncidentReportTaskEvidence[];
+}
+
+export interface IncidentReportActionPlan {
+  id: string;
+  incidentId: string;
+  caseId: string;
+  title?: unknown;
+  description?: unknown;
+  comment?: unknown;
+  verification?: {
+    id: string;
+    actionPlanId: string;
+    verified: boolean;
+    assignedUserForVerification?: string;
+    assignedEmployeeForVerification?: string;
+    comments?: unknown;
+  };
+  tasks: IncidentReportTask[];
+}
+
+export interface IncidentReportCase {
+  id: string;
+  incidentId: string;
+  findingId: string;
+  assignedUserId?: unknown;
+  status: string;
+  investigation?: {
+    id: string;
+    caseId: string;
+    investigationNotes: string;
+    rootCause: string;
+    requiresCorrectiveAction: boolean;
+    createdAt: string;
+    updatedAt: string;
+  };
+  comments: Array<{
+    id: string;
+    userId: string;
+    comment: string;
+    time: string;
+  }>;
+  attachments: Array<{
+    id: string;
+    userId: string;
+    fileId: string;
+    name: string;
+    size: number;
+    time: string;
+  }>;
+  actionPlan?: IncidentReportActionPlan;
+}
+
+export interface IncidentReportFinding {
+  id: string;
+  priority: string;
+  assignedUserId?: unknown;
+  ruleName?: unknown;
+  details?: Record<string, unknown>;
+  cases: IncidentReportCase[];
+}
+
+export interface IncidentReportIncident {
+  id: string;
+  companyId: string;
+  integrationId: number;
+  riskObjectId: string;
+  riskObjectName?: unknown;
+  documentId?: unknown;
+  integrationName?: unknown;
+  status: string;
+}
+
+export interface IncidentReportItem {
+  incident: IncidentReportIncident;
+  findings: IncidentReportFinding[];
+}
+
+export interface IncidentReportsPageResult {
+  items: IncidentReportItem[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 }
