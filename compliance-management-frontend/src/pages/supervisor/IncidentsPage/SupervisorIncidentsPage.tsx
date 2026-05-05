@@ -585,6 +585,7 @@ export const SupervisorIncidentsPage: FC = observer(() => {
                       <TableCell>Правило</TableCell>
                       <TableCell>Ответственный</TableCell>
                       <TableCell>Обнаружен</TableCell>
+                      <TableCell>Решен</TableCell>
                       <TableCell align="right">Действия</TableCell>
                     </TableRow>
                   </TableHead>
@@ -619,6 +620,13 @@ export const SupervisorIncidentsPage: FC = observer(() => {
                         <TableCell>
                           <Typography variant="caption">
                             {new Date(incident.detectedAt).toLocaleString('ru-RU')}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="caption">
+                            {incident.resolvedAt
+                              ? new Date(incident.resolvedAt).toLocaleString('ru-RU')
+                              : '-'}
                           </Typography>
                         </TableCell>
                         <TableCell align="right">
@@ -658,6 +666,8 @@ export const SupervisorIncidentsPage: FC = observer(() => {
                     <TableCell>Критичность</TableCell>
                     <TableCell>Ответственный</TableCell>
                     <TableCell>Статус</TableCell>
+                    <TableCell>Обнаружен</TableCell>
+                    <TableCell>Решен</TableCell>
                     <TableCell align="right">Действия</TableCell>
                   </TableRow>
                 </TableHead>
@@ -695,6 +705,18 @@ export const SupervisorIncidentsPage: FC = observer(() => {
                           size="small"
                         />
                       </TableCell>
+                      <TableCell>
+                        <Typography variant="caption">
+                          {new Date(incident.detectedAt).toLocaleString('ru-RU')}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption">
+                          {incident.resolvedAt
+                            ? new Date(incident.resolvedAt).toLocaleString('ru-RU')
+                            : '-'}
+                        </Typography>
+                      </TableCell>
                       <TableCell align="right">
                         <Tooltip title="Просмотр">
                           <IconButton size="small" onClick={() => handleOpenIncident(incident)}>
@@ -727,6 +749,7 @@ export const SupervisorIncidentsPage: FC = observer(() => {
                     <TableCell>Ответственный</TableCell>
                     <TableCell>Статус</TableCell>
                     <TableCell>Обнаружен</TableCell>
+                    <TableCell>Решен</TableCell>
                     <TableCell align="right">Действия</TableCell>
                   </TableRow>
                 </TableHead>
@@ -760,6 +783,13 @@ export const SupervisorIncidentsPage: FC = observer(() => {
                       <TableCell>
                         <Typography variant="caption">
                           {new Date(incident.detectedAt).toLocaleDateString('ru-RU')}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption">
+                          {incident.resolvedAt
+                            ? new Date(incident.resolvedAt).toLocaleDateString('ru-RU')
+                            : '-'}
                         </Typography>
                       </TableCell>
                       <TableCell align="right">

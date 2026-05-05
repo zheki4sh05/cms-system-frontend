@@ -1042,8 +1042,8 @@ export const ManagerIncidentsPage: FC = observer(() => {
                     <TableCell>Описание инцидента</TableCell>
                     <TableCell>Категория</TableCell>
                     <TableCell>Статус</TableCell>
+                    <TableCell>Обнаружен</TableCell>
                     <TableCell>Решен</TableCell>
-                    <TableCell>Связанный случай</TableCell>
                     <TableCell align="right">Действия</TableCell>
                   </TableRow>
                 </TableHead>
@@ -1072,21 +1072,13 @@ export const ManagerIncidentsPage: FC = observer(() => {
                         />
                       </TableCell>
                       <TableCell>
+                        {new Date(incident.detectedAt).toLocaleString('ru-RU')}
+                      </TableCell>
+                      <TableCell>
                         {incident.resolvedAt 
                           ? new Date(incident.resolvedAt).toLocaleString('ru-RU')
                           : '-'
                         }
-                      </TableCell>
-                      <TableCell>
-                        {incident.caseId ? (
-                          <Chip
-                            label={incident.caseTitle || incident.caseId}
-                            size="small"
-                            icon={<CaseIcon />}
-                            onClick={() => navigate('/manager/cases')}
-                            sx={{ cursor: 'pointer' }}
-                          />
-                        ) : '-'}
                       </TableCell>
                       <TableCell align="right">
                         <Tooltip title="Просмотр">

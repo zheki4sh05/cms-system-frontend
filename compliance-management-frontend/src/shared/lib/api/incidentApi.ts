@@ -72,6 +72,12 @@ export class IncidentApi {
       typeof incident.detectedAt === 'string' && incident.detectedAt.length > 0
         ? incident.detectedAt
         : new Date().toISOString();
+    const resolvedAt =
+      typeof incident.resolvedAt === 'string' && incident.resolvedAt.length > 0
+        ? incident.resolvedAt
+        : typeof (incident as Partial<Incident> & { resolved_date?: unknown }).resolved_date === 'string'
+          ? (incident as Partial<Incident> & { resolved_date?: string }).resolved_date
+          : undefined;
 
     const rawEmployees = incident.employees;
     const employees: Incident['employees'] = Array.isArray(rawEmployees)
@@ -111,7 +117,7 @@ export class IncidentApi {
       detectedAt,
       createdAt: incident.createdAt || detectedAt,
       updatedAt: incident.updatedAt || detectedAt,
-      resolvedAt: incident.resolvedAt,
+      resolvedAt,
       caseId: incident.caseId,
       caseTitle: incident.caseTitle,
       sourceSystem: incident.sourceSystem || '-',
