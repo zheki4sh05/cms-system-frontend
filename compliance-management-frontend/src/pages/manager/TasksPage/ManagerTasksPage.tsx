@@ -36,6 +36,7 @@ import {
   MenuItem,
   LinearProgress,
   Tooltip,
+  Stack,
   Avatar,
   ListItemAvatar,
 } from '@mui/material';
@@ -49,6 +50,7 @@ import {
   AttachFile as AttachIcon,
   Visibility as ViewIcon,
   Send as SendIcon,
+  Comment as CommentIcon,
   Info as InfoIcon,
   Assignment as AssignmentIcon,
   Close as CloseIcon,
@@ -56,12 +58,14 @@ import {
   Edit as EditIcon,
 } from '@mui/icons-material';
 import { TaskApi } from '@shared/lib/api/taskApi';
-import { getCaseStatusLabelRu } from '@shared/lib/statusLabels';
+import { getCaseStatusLabelRu, getIncidentStatusLabelRu } from '@shared/lib/statusLabels';
 import { CaseApi } from '@shared/lib/api/caseApi';
+import { IncidentApi } from '@shared/lib/api/incidentApi';
 import {
   ActionPlanDetailsSection,
   ActionPlanRiskObjectCaption,
 } from '@shared/lib/actionPlanView';
+import { getFileKindShortLabel } from '@shared/lib/fileDisplay';
 import type {
   Task,
   TaskStatus,
@@ -70,7 +74,8 @@ import type {
   CreateTaskRequest,
   TaskStatistics,
 } from '@shared/types/taskTypes';
-import type { Case } from '@shared/types/caseTypes';
+import type { Case, CaseAttachment, CaseComment, CaseViewItem } from '@shared/types/caseTypes';
+import type { Incident, IncidentViewDto } from '@shared/types/incidentTypes';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -103,6 +108,24 @@ export const ManagerTasksPage: FC = observer(() => {
   const [viewPlanDialogOpen, setViewPlanDialogOpen] = useState(false);
   const [editPlanDialogOpen, setEditPlanDialogOpen] = useState(false);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [taskDetailsDialogOpen, setTaskDetailsDialogOpen] = useState(false);
+  const [detailIncident, setDetailIncident] = useState<Incident | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailActionError, setDetailActionError] = useState<string | null>(null);
+  const [casePreviewOpen, setCasePreviewOpen] = useState(false);
+  const [casePreviewTab, setCasePreviewTab] = useState(0);
+  const [casePreviewView, setCasePreviewView] = useState<CaseViewItem | null>(null);
+  const [casePreviewLoading, setCasePreviewLoading] = useState(false);
+  const [caseComments, setCaseComments] = useState<CaseComment[]>([]);
+  const [caseCommentsLoading, setCaseCommentsLoading] = useState(false);
+  const [caseAttachments, setCaseAttachments] = useState<CaseAttachment[]>([]);
+  const [caseAttachmentsLoading, setCaseAttachmentsLoading] = useState(false);
+  const [newCaseComment, setNewCaseComment] = useState('');
+  const [caseAttachmentDownloadId, setCaseAttachmentDownloadId] = useState<string | null>(null);
+  const [caseAttachmentDeleteId, setCaseAttachmentDeleteId] = useState<string | null>(null);
+  const [incidentPreviewOpen, setIncidentPreviewOpen] = useState(false);
+  const [incidentViewData, setIncidentViewData] = useState<IncidentViewDto | null>(null);
+  const [incidentPreviewLoading, setIncidentPreviewLoading] = useState(false);
 
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   const [editPlanTitle, setEditPlanTitle] = useState('');
@@ -416,6 +439,182 @@ export const ManagerTasksPage: FC = observer(() => {
     setTaskDialogOpen(true);
   };
 
+  const handleOpenTaskDetails = async (task: Task) => {
+    setSelectedTask(task);
+    setDetailIncident(null);
+    setDetailActionError(null);
+    setTaskDetailsDialogOpen(true);
+  };
+
+  const handleOpenTaskActionPlan = async () => {
+    if (!selectedTask?.actionPlanId) {
+      setDetailActionError('Для задачи не передан идентификатор плана действий.');
+      return;
+    }
+    try {
+      setDetailActionError(null);
+      const existingPlan = actionPlans.find((plan) => plan.id === selectedTask.actionPlanId);
+      const plan = existingPlan ?? (await TaskApi.getActionPlan(selectedTask.actionPlanId));
+      setSelectedPlan(plan);
+      setViewPlanDialogOpen(true);
+      setTaskDetailsDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to load action plan details:', error);
+      setDetailActionError('Не удалось открыть план действий.');
+    }
+  };
+
+  const handleOpenTaskCase = async () => {
+    if (!selectedTask?.caseId) {
+      setDetailActionError('Для задачи не передан идентификатор случая.');
+      return;
+    }
+    try {
+      setDetailLoading(true);
+      setDetailActionError(null);
+      setCasePreviewOpen(true);
+      setCasePreviewTab(0);
+      setCasePreviewLoading(true);
+      setCaseCommentsLoading(true);
+      setCaseAttachmentsLoading(true);
+
+      const [caseViewData, commentsData, attachmentsData] = await Promise.allSettled([
+        CaseApi.getCaseViewFromCasesService(selectedTask.caseId),
+        CaseApi.getCaseComments(selectedTask.caseId),
+        CaseApi.getCaseAttachments(selectedTask.caseId),
+      ]);
+
+      setCasePreviewView(caseViewData.status === 'fulfilled' ? caseViewData.value : null);
+      setCaseComments(commentsData.status === 'fulfilled' ? commentsData.value : []);
+      setCaseAttachments(attachmentsData.status === 'fulfilled' ? attachmentsData.value : []);
+      setTaskDetailsDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to load case details:', error);
+      setDetailActionError('Не удалось открыть случай.');
+    } finally {
+      setDetailLoading(false);
+      setCasePreviewLoading(false);
+      setCaseCommentsLoading(false);
+      setCaseAttachmentsLoading(false);
+    }
+  };
+
+  const handleAddCaseComment = async () => {
+    if (!selectedTask?.caseId || !newCaseComment.trim()) return;
+    try {
+      await CaseApi.addCaseComment(selectedTask.caseId, newCaseComment.trim());
+      const comments = await CaseApi.getCaseComments(selectedTask.caseId);
+      setCaseComments(comments);
+      setNewCaseComment('');
+    } catch (error) {
+      console.error('Failed to add case comment from tasks page:', error);
+    }
+  };
+
+  const handleUploadCaseAttachmentFromTasks = async (file: File | null) => {
+    if (!file || !selectedTask?.caseId) return;
+    try {
+      setCaseAttachmentsLoading(true);
+      await CaseApi.uploadCaseAttachment(selectedTask.caseId, file);
+      const attachments = await CaseApi.getCaseAttachments(selectedTask.caseId);
+      setCaseAttachments(attachments);
+    } catch (error) {
+      console.error('Failed to upload case attachment from tasks page:', error);
+    } finally {
+      setCaseAttachmentsLoading(false);
+    }
+  };
+
+  const handleDownloadCaseAttachmentFromTasks = async (attachment: CaseAttachment) => {
+    if (!selectedTask?.caseId) return;
+    try {
+      setCaseAttachmentDownloadId(attachment.id);
+      await CaseApi.downloadCaseAttachment(
+        selectedTask.caseId,
+        attachment.id,
+        attachment.fileName
+      );
+    } catch (error) {
+      console.error('Failed to download case attachment from tasks page:', error);
+    } finally {
+      setCaseAttachmentDownloadId(null);
+    }
+  };
+
+  const handleDeleteCaseAttachmentFromTasks = async (attachment: CaseAttachment) => {
+    if (!selectedTask?.caseId) return;
+    try {
+      setCaseAttachmentDeleteId(attachment.id);
+      await CaseApi.deleteCaseAttachment(selectedTask.caseId, attachment.id);
+      setCaseAttachments((prev) => prev.filter((a) => a.id !== attachment.id));
+    } catch (error) {
+      console.error('Failed to delete case attachment from tasks page:', error);
+    } finally {
+      setCaseAttachmentDeleteId(null);
+    }
+  };
+
+  const stringifyValue = (value: unknown): string => {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (value && typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return '-';
+      }
+    }
+    return '-';
+  };
+
+  const getRiskSeverityLabel = (severity?: string): string => {
+    if (!severity) return '-';
+    const labels: Record<string, string> = {
+      LOW: 'Низкая',
+      MEDIUM: 'Средняя',
+      HIGH: 'Высокая',
+      CRITICAL: 'Критичная',
+    };
+    return labels[severity.toUpperCase()] || severity;
+  };
+
+  const getIncidentSeverityColor = (
+    severity: Incident['severity']
+  ): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
+    switch (severity) {
+      case 'CRITICAL': return 'error';
+      case 'HIGH': return 'warning';
+      case 'MEDIUM': return 'info';
+      case 'LOW': return 'success';
+    }
+  };
+
+  const handleOpenTaskIncident = async () => {
+    if (!selectedTask?.incidentId) {
+      setDetailActionError('Для задачи не передан идентификатор инцидента.');
+      return;
+    }
+    try {
+      setDetailLoading(true);
+      setIncidentPreviewLoading(true);
+      setDetailActionError(null);
+      const [incidentData, incidentView] = await Promise.all([
+        IncidentApi.getIncident(selectedTask.incidentId),
+        IncidentApi.getIncidentView(selectedTask.incidentId),
+      ]);
+      setDetailIncident(incidentData);
+      setIncidentViewData(incidentView);
+      setIncidentPreviewOpen(true);
+      setTaskDetailsDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to load incident details:', error);
+      setDetailActionError('Не удалось открыть инцидент.');
+    } finally {
+      setDetailLoading(false);
+      setIncidentPreviewLoading(false);
+    }
+  };
+
   const handleCompleteTask = async () => {
     if (!selectedTask) return;
     
@@ -454,10 +653,19 @@ export const ManagerTasksPage: FC = observer(() => {
 
   const getTaskPriorityColor = (priority: TaskPriority) => {
     switch (priority) {
-      case 'URGENT': return 'error';
+      case 'URGENT': return 'warning';
       case 'HIGH': return 'warning';
       case 'NORMAL': return 'info';
       case 'LOW': return 'success';
+    }
+  };
+
+  const getTaskPriorityLabel = (priority: TaskPriority) => {
+    switch (priority) {
+      case 'URGENT': return 'Высокий';
+      case 'HIGH': return 'Высокий';
+      case 'NORMAL': return 'Средний';
+      case 'LOW': return 'Низкий';
     }
   };
 
@@ -517,6 +725,10 @@ export const ManagerTasksPage: FC = observer(() => {
   /** Отправка на утверждение доступна, пока случай в фазе плана действий */
   const canSubmitActionPlanForVerification = (plan: ActionPlan) =>
     plan.caseStatus?.trim().toUpperCase() === 'ACTION_PLAN';
+
+  /** В фазе исполнения мероприятий добавлять новые задачи нельзя */
+  const canAddTasksToPlan = (plan: ActionPlan) =>
+    plan.caseStatus?.trim().toUpperCase() !== 'ACTION_IN_PROGRESS';
 
   const filteredTasks = tasks.filter(t =>
     t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -655,7 +867,7 @@ export const ManagerTasksPage: FC = observer(() => {
                               {task.title}
                             </Typography>
                             <Chip
-                              label={task.priority}
+                              label={getTaskPriorityLabel(task.priority)}
                               color={getTaskPriorityColor(task.priority)}
                               size="small"
                             />
@@ -677,6 +889,17 @@ export const ManagerTasksPage: FC = observer(() => {
                           )}
                         </CardContent>
                         <CardActions>
+                          <Tooltip title="Детализация">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleOpenTaskDetails(task);
+                              }}
+                            >
+                              <ViewIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           <Button
                             size="small"
                             startIcon={<StartIcon />}
@@ -709,7 +932,7 @@ export const ManagerTasksPage: FC = observer(() => {
                               {task.title}
                             </Typography>
                             <Chip
-                              label={task.priority}
+                              label={getTaskPriorityLabel(task.priority)}
                               color={getTaskPriorityColor(task.priority)}
                               size="small"
                             />
@@ -731,6 +954,17 @@ export const ManagerTasksPage: FC = observer(() => {
                           )}
                         </CardContent>
                         <CardActions>
+                          <Tooltip title="Детализация">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleOpenTaskDetails(task);
+                              }}
+                            >
+                              <ViewIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           <Button
                             size="small"
                             startIcon={<CheckIcon />}
@@ -778,6 +1012,19 @@ export const ManagerTasksPage: FC = observer(() => {
                             Завершено: {task.completedAt ? new Date(task.completedAt).toLocaleDateString('ru-RU') : '-'}
                           </Typography>
                         </CardContent>
+                        <CardActions>
+                          <Tooltip title="Детализация">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleOpenTaskDetails(task);
+                              }}
+                            >
+                              <ViewIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </CardActions>
                       </Card>
                     ))}
                   </Box>
@@ -988,9 +1235,8 @@ export const ManagerTasksPage: FC = observer(() => {
                         onChange={(e) => handleUpdatePlanTask(index, 'priority', e.target.value)}
                       >
                         <MenuItem value="LOW">Низкий</MenuItem>
-                        <MenuItem value="NORMAL">Нормальный</MenuItem>
+                        <MenuItem value="NORMAL">Средний</MenuItem>
                         <MenuItem value="HIGH">Высокий</MenuItem>
-                        <MenuItem value="URGENT">Срочный</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -1093,7 +1339,7 @@ export const ManagerTasksPage: FC = observer(() => {
                         secondary={
                           <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
                             <Chip label={getTaskStatusLabel(task.status)} size="small" color={getTaskStatusColor(task.status)} />
-                            <Chip label={task.priority} size="small" color={getTaskPriorityColor(task.priority)} />
+                            <Chip label={getTaskPriorityLabel(task.priority)} size="small" color={getTaskPriorityColor(task.priority)} />
                           </Box>
                         }
                       />
@@ -1106,6 +1352,11 @@ export const ManagerTasksPage: FC = observer(() => {
                 <Typography variant="subtitle1" gutterBottom>
                   Добавить задачу
                 </Typography>
+                {!canAddTasksToPlan(selectedPlan) && (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    Добавление новых задач недоступно, когда план в статусе «Исполнение мероприятий».
+                  </Alert>
+                )}
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 12 }}>
                     <TextField
@@ -1114,7 +1365,7 @@ export const ManagerTasksPage: FC = observer(() => {
                       label="Название"
                       value={viewNewTaskTitle}
                       onChange={(e) => setViewNewTaskTitle(e.target.value)}
-                      disabled={viewAddTaskSaving}
+                      disabled={viewAddTaskSaving || !canAddTasksToPlan(selectedPlan)}
                     />
                   </Grid>
                   <Grid size={{ xs: 12 }}>
@@ -1125,11 +1376,11 @@ export const ManagerTasksPage: FC = observer(() => {
                       minRows={2}
                       value={viewNewTaskDescription}
                       onChange={(e) => setViewNewTaskDescription(e.target.value)}
-                      disabled={viewAddTaskSaving}
+                      disabled={viewAddTaskSaving || !canAddTasksToPlan(selectedPlan)}
                     />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 6 }}>
-                    <FormControl fullWidth disabled={viewAddTaskSaving}>
+                    <FormControl fullWidth disabled={viewAddTaskSaving || !canAddTasksToPlan(selectedPlan)}>
                       <InputLabel>Приоритет</InputLabel>
                       <Select
                         value={viewNewTaskPriority}
@@ -1139,9 +1390,8 @@ export const ManagerTasksPage: FC = observer(() => {
                         }
                       >
                         <MenuItem value="LOW">Низкий</MenuItem>
-                        <MenuItem value="NORMAL">Нормальный</MenuItem>
+                        <MenuItem value="NORMAL">Средний</MenuItem>
                         <MenuItem value="HIGH">Высокий</MenuItem>
-                        <MenuItem value="URGENT">Срочный</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -1154,7 +1404,7 @@ export const ManagerTasksPage: FC = observer(() => {
                       onChange={(e) =>
                         setViewNewTaskDueDate(new Date(e.target.value).toISOString())
                       }
-                      disabled={viewAddTaskSaving}
+                      disabled={viewAddTaskSaving || !canAddTasksToPlan(selectedPlan)}
                       InputLabelProps={{ shrink: true }}
                     />
                   </Grid>
@@ -1164,6 +1414,7 @@ export const ManagerTasksPage: FC = observer(() => {
                       startIcon={<AddIcon />}
                       disabled={
                         viewAddTaskSaving ||
+                        !canAddTasksToPlan(selectedPlan) ||
                         !viewNewTaskTitle.trim()
                       }
                       onClick={() => void handleAppendTaskToPlan()}
@@ -1264,7 +1515,7 @@ export const ManagerTasksPage: FC = observer(() => {
                   <Typography variant="h6">{selectedTask.title}</Typography>
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <Chip
-                      label={selectedTask.priority}
+                      label={getTaskPriorityLabel(selectedTask.priority)}
                       color={getTaskPriorityColor(selectedTask.priority)}
                       size="small"
                     />
@@ -1408,6 +1659,340 @@ export const ManagerTasksPage: FC = observer(() => {
                     Завершить задачу
                   </Button>
                 )}
+                <Button
+                  variant="outlined"
+                  startIcon={<ViewIcon />}
+                  onClick={() => {
+                    setTaskDialogOpen(false);
+                    void handleOpenTaskDetails(selectedTask);
+                  }}
+                >
+                  Детализация
+                </Button>
+              </DialogActions>
+            </>
+          )}
+        </Dialog>
+
+        <Dialog
+          open={taskDetailsDialogOpen}
+          onClose={() => setTaskDetailsDialogOpen(false)}
+          maxWidth="md"
+          fullWidth
+        >
+          {selectedTask && (
+            <>
+              <DialogTitle>Детализация задачи</DialogTitle>
+              <DialogContent>
+                <Grid container spacing={2} sx={{ mb: 2 }}>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <Paper variant="outlined" sx={{ p: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary">Название плана действий</Typography>
+                      <Typography variant="body2">{String(selectedTask.actionPlanTitle ?? '-')}</Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <Paper variant="outlined" sx={{ p: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary">Статус случая</Typography>
+                      <Typography variant="body2">
+                        {selectedTask.caseStatus ? getCaseWorkflowStatusLabel(String(selectedTask.caseStatus)) : '-'}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid size={{ xs: 12 }}>
+                    <Paper variant="outlined" sx={{ p: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary">Описание плана действий</Typography>
+                      <Typography variant="body2">{String(selectedTask.actionPlanDescription ?? '-')}</Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid size={{ xs: 12 }}>
+                    <Paper variant="outlined" sx={{ p: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary">Комментарий к плану действий</Typography>
+                      <Typography variant="body2">{String(selectedTask.actionPlanComment ?? '-')}</Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid size={{ xs: 12 }}>
+                    <Paper variant="outlined" sx={{ p: 1.5 }}>
+                      <Typography variant="caption" color="text.secondary">Комментарий по задаче</Typography>
+                      <Typography variant="body2">{String(selectedTask.comment ?? '-')}</Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  <Button
+                    variant="contained"
+                    startIcon={<AssignmentIcon />}
+                    onClick={() => void handleOpenTaskActionPlan()}
+                    disabled={!selectedTask.actionPlanId}
+                  >
+                    Открыть план задач
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<ViewIcon />}
+                    onClick={() => void handleOpenTaskCase()}
+                    disabled={!selectedTask.caseId}
+                  >
+                    Открыть случай
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<ViewIcon />}
+                    onClick={() => void handleOpenTaskIncident()}
+                    disabled={!selectedTask.incidentId}
+                  >
+                    Открыть инцидент
+                  </Button>
+                </Stack>
+
+                {detailLoading && (
+                  <Box sx={{ py: 2, display: 'flex', justifyContent: 'center' }}>
+                    <CircularProgress size={28} />
+                  </Box>
+                )}
+
+                {detailActionError && (
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    {detailActionError}
+                  </Alert>
+                )}
+
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setTaskDetailsDialogOpen(false)}>Закрыть</Button>
+              </DialogActions>
+            </>
+          )}
+        </Dialog>
+
+        <Dialog open={casePreviewOpen} onClose={() => setCasePreviewOpen(false)} maxWidth="md" fullWidth>
+          {selectedTask?.caseId && (
+            <>
+              <DialogTitle>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <Typography variant="h6">{selectedTask.title}</Typography>
+                    <Typography variant="caption" color="text.secondary">ID: {selectedTask.caseId}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Chip
+                      label={selectedTask.caseStatus ? getCaseWorkflowStatusLabel(String(selectedTask.caseStatus)) : 'Статус не указан'}
+                      color={selectedTask.caseStatus ? getCaseWorkflowStatusColor(String(selectedTask.caseStatus)) : 'default'}
+                      size="small"
+                    />
+                  </Box>
+                </Box>
+              </DialogTitle>
+              <Tabs value={casePreviewTab} onChange={(_, next) => setCasePreviewTab(next)} sx={{ borderBottom: 1, borderColor: 'divider', px: 3 }}>
+                <Tab label="Описание" />
+                <Tab label="Расследование" />
+                <Tab label="Комментарии" icon={<Chip label={caseComments.length} size="small" />} iconPosition="end" />
+                <Tab label="Вложения" icon={<Chip label={caseAttachments.length} size="small" />} iconPosition="end" />
+              </Tabs>
+              <DialogContent>
+                <TabPanel value={casePreviewTab} index={0}>
+                  <Typography variant="body1" paragraph>{selectedTask.description || '-'}</Typography>
+                  {!casePreviewLoading && casePreviewView && (
+                    <>
+                      <Divider sx={{ my: 2 }} />
+                      <Typography variant="subtitle2" gutterBottom>Данные правила</Typography>
+                      <Grid container spacing={2}>
+                        <Grid size={{ xs: 6 }}>
+                          <Typography variant="caption" color="text.secondary">Название правила</Typography>
+                          <Typography variant="body2">{stringifyValue(casePreviewView.ruleName)}</Typography>
+                        </Grid>
+                        <Grid size={{ xs: 6 }}>
+                          <Typography variant="caption" color="text.secondary">ID правила</Typography>
+                          <Typography variant="body2">{stringifyValue(casePreviewView.ruleId)}</Typography>
+                        </Grid>
+                        <Grid size={{ xs: 12 }}>
+                          <Typography variant="caption" color="text.secondary">Условие правила</Typography>
+                          <Typography variant="body2">{stringifyValue(casePreviewView.ruleCondition)}</Typography>
+                        </Grid>
+                        <Grid size={{ xs: 12 }}>
+                          <Typography variant="caption" color="text.secondary">Результаты выявления риска</Typography>
+                          <Paper sx={{ p: 1.5, bgcolor: 'grey.50' }}>
+                            <Typography variant="body2">
+                              Заголовок: {stringifyValue((casePreviewView.details as Record<string, unknown> | undefined)?.title)}
+                            </Typography>
+                            <Typography variant="body2">
+                              Критичность: {getRiskSeverityLabel(stringifyValue((casePreviewView.details as Record<string, unknown> | undefined)?.severity))}
+                            </Typography>
+                            <Typography variant="body2">
+                              Описание: {stringifyValue((casePreviewView.details as Record<string, unknown> | undefined)?.description)}
+                            </Typography>
+                            <Typography variant="body2">
+                              Рекомендация: {stringifyValue((casePreviewView.details as Record<string, unknown> | undefined)?.recommendation)}
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                      </Grid>
+                    </>
+                  )}
+                </TabPanel>
+
+                <TabPanel value={casePreviewTab} index={1}>
+                  <Typography variant="body2" paragraph>
+                    Заметки: {stringifyValue(casePreviewView?.investigationNotes)}
+                  </Typography>
+                  <Typography variant="body2">
+                    Первопричина: {stringifyValue(casePreviewView?.rootCause)}
+                  </Typography>
+                </TabPanel>
+
+                <TabPanel value={casePreviewTab} index={2}>
+                  {caseCommentsLoading ? <CircularProgress size={24} /> : (
+                    <>
+                      <List>
+                        {caseComments.map((comment) => (
+                          <ListItem key={comment.id}>
+                            <ListItemText
+                              primary={comment.authorName || 'Пользователь'}
+                              secondary={`${comment.content} • ${comment.createdAt ? new Date(comment.createdAt).toLocaleString('ru-RU') : '-'}`}
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                      <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+                        <TextField
+                          fullWidth
+                          placeholder="Добавить комментарий..."
+                          value={newCaseComment}
+                          onChange={(e) => setNewCaseComment(e.target.value)}
+                          multiline
+                          maxRows={3}
+                        />
+                        <Button variant="contained" onClick={() => void handleAddCaseComment()} disabled={!newCaseComment.trim()}>
+                          <CommentIcon />
+                        </Button>
+                      </Box>
+                    </>
+                  )}
+                </TabPanel>
+
+                <TabPanel value={casePreviewTab} index={3}>
+                  {caseAttachmentsLoading ? <CircularProgress size={24} /> : (
+                    <>
+                      <Button component="label" variant="outlined" sx={{ mb: 2 }}>
+                        Загрузить файл
+                        <input
+                          type="file"
+                          hidden
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] ?? null;
+                            void handleUploadCaseAttachmentFromTasks(file);
+                            event.target.value = '';
+                          }}
+                        />
+                      </Button>
+                      <List>
+                        {caseAttachments.map((attachment) => (
+                          <ListItem
+                            key={attachment.id}
+                            secondaryAction={
+                              <Stack direction="row" spacing={1}>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => void handleDownloadCaseAttachmentFromTasks(attachment)}
+                                  disabled={caseAttachmentDownloadId === attachment.id}
+                                >
+                                  Скачать
+                                </Button>
+                                <Button
+                                  size="small"
+                                  color="error"
+                                  variant="outlined"
+                                  onClick={() => void handleDeleteCaseAttachmentFromTasks(attachment)}
+                                  disabled={caseAttachmentDeleteId === attachment.id}
+                                >
+                                  Удалить
+                                </Button>
+                              </Stack>
+                            }
+                          >
+                            <ListItemText
+                              primary={attachment.fileName}
+                              secondary={`${(attachment.fileSize / 1024).toFixed(2)} KB • ${getFileKindShortLabel(attachment.fileName, attachment.fileType)}`}
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    </>
+                  )}
+                </TabPanel>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setCasePreviewOpen(false)}>Закрыть</Button>
+              </DialogActions>
+            </>
+          )}
+        </Dialog>
+
+        <Dialog open={incidentPreviewOpen} onClose={() => setIncidentPreviewOpen(false)} maxWidth="md" fullWidth>
+          {detailIncident && (
+            <>
+              <DialogTitle>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <Typography variant="h6">{detailIncident.riskObjectName || detailIncident.title}</Typography>
+                    <Typography variant="caption" color="text.secondary">ID: {detailIncident.id}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Chip label={detailIncident.severity} color={getIncidentSeverityColor(detailIncident.severity)} size="small" />
+                    <Chip label={getIncidentStatusLabelRu(detailIncident.status)} color={getCaseWorkflowStatusColor(detailIncident.status)} size="small" />
+                  </Box>
+                </Box>
+              </DialogTitle>
+              <DialogContent>
+                {incidentPreviewLoading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : (
+                  <>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 6 }}>
+                        <Typography variant="caption" color="text.secondary">Категория</Typography>
+                        <Typography variant="body2">{detailIncident.category}</Typography>
+                      </Grid>
+                      <Grid size={{ xs: 6 }}>
+                        <Typography variant="caption" color="text.secondary">Дата обнаружения</Typography>
+                        <Typography variant="body2">{new Date(detailIncident.detectedAt).toLocaleString('ru-RU')}</Typography>
+                      </Grid>
+                      <Grid size={{ xs: 6 }}>
+                        <Typography variant="caption" color="text.secondary">Интеграция</Typography>
+                        <Typography variant="body2">{stringifyValue(incidentViewData?.integrationName)}</Typography>
+                      </Grid>
+                      <Grid size={{ xs: 6 }}>
+                        <Typography variant="caption" color="text.secondary">ID документа</Typography>
+                        <Typography variant="body2">{stringifyValue(incidentViewData?.documentId)}</Typography>
+                      </Grid>
+                    </Grid>
+                    <Divider sx={{ my: 2 }} />
+                    <Typography variant="subtitle2" gutterBottom>Обнаруженные риски</Typography>
+                    {!incidentViewData?.findings?.length ? (
+                      <Alert severity="info">По этому инциденту не найдены findings.</Alert>
+                    ) : (
+                      <Stack spacing={1.5}>
+                        {incidentViewData.findings.map((finding) => (
+                          <Paper key={finding.id} variant="outlined" sx={{ p: 1.5 }}>
+                            <Typography variant="caption" color="text.secondary">Finding ID</Typography>
+                            <Typography variant="body2">{finding.id}</Typography>
+                            <Typography variant="caption" color="text.secondary">Приоритет</Typography>
+                            <Typography variant="body2">{finding.priority || '-'}</Typography>
+                            <Typography variant="caption" color="text.secondary">Детали</Typography>
+                            <Typography variant="body2">{stringifyValue(finding.details)}</Typography>
+                          </Paper>
+                        ))}
+                      </Stack>
+                    )}
+                  </>
+                )}
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={() => setIncidentPreviewOpen(false)}>Закрыть</Button>
               </DialogActions>
             </>
           )}

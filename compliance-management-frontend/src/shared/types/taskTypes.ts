@@ -20,6 +20,13 @@ export interface Task {
   description: string;
   status: TaskStatus;
   priority: TaskPriority;
+  incidentId?: string;
+  documentId?: unknown;
+  incidentStatus?: unknown;
+  comment?: unknown;
+  actionPlanTitle?: unknown;
+  actionPlanDescription?: unknown;
+  actionPlanComment?: unknown;
 
   /** Ответ POST /api/action-plans */
   caseStatus?: unknown;

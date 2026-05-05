@@ -52,9 +52,10 @@ function coercePlanComment(value: unknown): string | null | undefined {
 function normalizeTaskPriority(value: unknown): TaskPriority {
   if (typeof value === 'string') {
     const u = value.toUpperCase();
-    if (u === 'LOW' || u === 'NORMAL' || u === 'HIGH' || u === 'URGENT') {
+    if (u === 'LOW' || u === 'NORMAL' || u === 'HIGH') {
       return u as TaskPriority;
     }
+    if (u === 'URGENT') return TaskPriority.HIGH;
   }
   return TaskPriority.NORMAL;
 }
@@ -86,11 +87,19 @@ function normalizePlanDetails(value: unknown): Record<string, unknown> | undefin
   return o;
 }
 
-function coerceCaseId(value: unknown): string | undefined {
-  if (typeof value === 'string') return value;
-  if (value == null) return undefined;
-  const s = planFieldToString(value);
-  return s || undefined;
+function coerceIdentifier(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === '{}' || trimmed === '[]') return undefined;
+    return trimmed;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (value && typeof value === 'object') {
+    const asRecord = value as Record<string, unknown>;
+    if (typeof asRecord.id === 'string' && asRecord.id.trim()) return asRecord.id.trim();
+    return undefined;
+  }
+  return undefined;
 }
 
 function dueInDays(dueDate: string): number {
@@ -133,9 +142,16 @@ function coerceTask(raw: unknown): Task {
     description: planFieldToString(o.description),
     status: normalizeTaskStatus(o.status),
     priority: normalizeTaskPriority(o.priority),
-    actionPlanId: typeof o.actionPlanId === 'string' ? o.actionPlanId : undefined,
-    caseId: coerceCaseId(o.caseId),
+    actionPlanId: coerceIdentifier(o.actionPlanId),
+    caseId: coerceIdentifier(o.caseId),
     caseStatus: o.caseStatus,
+    incidentId: coerceIdentifier(o.incidentId),
+    documentId: o.documentId,
+    incidentStatus: o.incidentStatus,
+    comment: o.comment,
+    actionPlanTitle: o.actionPlanTitle,
+    actionPlanDescription: o.actionPlanDescription,
+    actionPlanComment: o.actionPlanComment,
     assigneeId: typeof o.assigneeId === 'string' ? o.assigneeId : '',
     assigneeName: typeof o.assigneeName === 'string' ? o.assigneeName : '',
     createdBy: typeof o.createdBy === 'string' ? o.createdBy : '',

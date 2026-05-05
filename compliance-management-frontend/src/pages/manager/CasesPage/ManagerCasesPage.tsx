@@ -404,9 +404,9 @@ export const ManagerCasesPage: FC = observer(() => {
   const getPriorityLabel = (priority: CasePriority): string => {
     const labels: Record<CasePriority, string> = {
       LOW: 'Низкий',
-      NORMAL: 'Нормальный',
+      NORMAL: 'Средний',
       HIGH: 'Высокий',
-      URGENT: 'Срочный',
+      URGENT: 'Высокий',
     };
     return labels[priority];
   };

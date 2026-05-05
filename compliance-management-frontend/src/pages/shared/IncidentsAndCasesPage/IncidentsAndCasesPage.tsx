@@ -86,8 +86,8 @@ const getPriorityLabel = (priority: string): string => {
     MEDIUM: 'Средний',
     NORMAL: 'Средний',
     HIGH: 'Высокий',
-    URGENT: 'Критичный',
-    CRITICAL: 'Критичный',
+    URGENT: 'Высокий',
+    CRITICAL: 'Высокий',
   };
   const normalized = priority.toUpperCase();
   return labels[normalized] ?? priority;

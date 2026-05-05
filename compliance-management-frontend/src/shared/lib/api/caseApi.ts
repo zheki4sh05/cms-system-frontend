@@ -134,6 +134,16 @@ export class CaseApi {
   }
 
   /**
+   * Получить данные просмотра случая из case-service (порт 8081)
+   */
+  static async getCaseViewFromCasesService(caseId: string): Promise<CaseViewItem> {
+    const response = await apiClient.get<CaseViewItem>(
+      `http://localhost:8081/api/v1/cases/${encodeURIComponent(caseId)}/view`
+    );
+    return response.data;
+  }
+
+  /**
    * Получить статистику по случаям
    */
   static async getCaseStatistics(): Promise<CaseStatistics> {

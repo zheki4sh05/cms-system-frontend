@@ -1452,9 +1452,8 @@ export const ManagerIncidentsPage: FC = observer(() => {
                     label="Приоритет"
                   >
                     <MenuItem value="LOW">Низкий</MenuItem>
-                    <MenuItem value="NORMAL">Нормальный</MenuItem>
+                    <MenuItem value="NORMAL">Средний</MenuItem>
                     <MenuItem value="HIGH">Высокий</MenuItem>
-                    <MenuItem value="URGENT">Срочный</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>
