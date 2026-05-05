@@ -59,6 +59,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { CaseApi } from '@shared/lib/api/caseApi';
 import { getFileKindShortLabel } from '@shared/lib/fileDisplay';
+import { getCaseStatusLabelRu } from '@shared/lib/statusLabels';
 import { TaskApi } from '@shared/lib/api/taskApi';
 import { RuleApi } from '@shared/lib/api/ruleApi';
 import { IncidentApi } from '@shared/lib/api/incidentApi';
@@ -397,19 +398,7 @@ export const ManagerCasesPage: FC = observer(() => {
   };
 
   const getStatusLabel = (status: CaseStatus) => {
-    const labels = {
-      OPEN: 'Открыт',
-      ASSIGNED: 'Назначен ответственный',
-      IN_PROGRESS: 'В работе',
-      INVESTIGATING: 'Расследование',
-      ACTION_PLAN: 'План действий',
-      ACTION_IN_PROGRESS: 'План в работе',
-      WAITING_VERIFICATION: 'На проверке',
-      CLOSED: 'Закрыт',
-      REJECTED: 'Отклонен',
-      ESCALATED_TO_CASE: 'Эскалация'
-    };
-    return labels[status];
+    return getCaseStatusLabelRu(status);
   };
 
   const getPriorityLabel = (priority: CasePriority): string => {

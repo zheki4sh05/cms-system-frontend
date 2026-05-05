@@ -32,25 +32,26 @@ import {
   type ArchiveNonComplianceItem,
   type ArchivePlanItem,
 } from '@shared/lib/api/archiveApi';
+import { CASE_STATUS_LABELS_RU, INCIDENT_STATUS_LABELS_RU } from '@shared/lib/statusLabels';
 
 type ArchiveTab = 'incidents' | 'nonCompliance' | 'cases' | 'investigationPlans';
 
 const incidentStatusLabel: Record<string, string> = {
-  RESOLVED: 'Решен',
-  FALSE_POSITIVE: 'Ложное срабатывание',
-  ESCALATED_TO_CASE: 'Эскалирован в случай',
+  RESOLVED: INCIDENT_STATUS_LABELS_RU.RESOLVED,
+  FALSE_POSITIVE: INCIDENT_STATUS_LABELS_RU.FALSE_POSITIVE,
+  ESCALATED_TO_CASE: INCIDENT_STATUS_LABELS_RU.ESCALATED_TO_CASE,
 };
 
 const caseStatusLabel: Record<string, string> = {
-  OPEN: 'Открыт',
-  IN_PROGRESS: 'В работе',
-  INVESTIGATING: 'Расследование',
-  ACTION_PLAN: 'План действий',
-  ACTION_IN_PROGRESS: 'Выполнение плана',
-  WAITING_VERIFICATION: 'Ожидает проверки',
-  CLOSED: 'Закрыт',
-  REJECTED: 'Отклонен',
-  ESCALATED_TO_CASE: 'Эскалирован',
+  OPEN: CASE_STATUS_LABELS_RU.OPEN,
+  IN_PROGRESS: CASE_STATUS_LABELS_RU.IN_PROGRESS,
+  INVESTIGATING: CASE_STATUS_LABELS_RU.INVESTIGATING,
+  ACTION_PLAN: CASE_STATUS_LABELS_RU.ACTION_PLAN,
+  ACTION_IN_PROGRESS: CASE_STATUS_LABELS_RU.ACTION_IN_PROGRESS,
+  WAITING_VERIFICATION: CASE_STATUS_LABELS_RU.WAITING_VERIFICATION,
+  CLOSED: CASE_STATUS_LABELS_RU.CLOSED,
+  REJECTED: CASE_STATUS_LABELS_RU.REJECTED,
+  ESCALATED_TO_CASE: CASE_STATUS_LABELS_RU.ESCALATED_TO_CASE,
 };
 
 const planStatusLabel: Record<string, string> = {

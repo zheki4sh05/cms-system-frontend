@@ -56,6 +56,7 @@ import {
   Edit as EditIcon,
 } from '@mui/icons-material';
 import { TaskApi } from '@shared/lib/api/taskApi';
+import { getCaseStatusLabelRu } from '@shared/lib/statusLabels';
 import { CaseApi } from '@shared/lib/api/caseApi';
 import {
   ActionPlanDetailsSection,
@@ -481,20 +482,7 @@ export const ManagerTasksPage: FC = observer(() => {
 
   /** Статус случая из GET /api/action-plans → поле caseStatus (отдельного статуса плана нет) */
   const getCaseWorkflowStatusLabel = (caseStatus: string) => {
-    const s = caseStatus.trim().toUpperCase();
-    const labels: Record<string, string> = {
-      OPEN: 'Открыт',
-      ASSIGNED: 'Назначен ответственный',
-      IN_PROGRESS: 'В работе',
-      INVESTIGATING: 'Расследование',
-      ACTION_PLAN: 'План действий',
-      ACTION_IN_PROGRESS: 'План в работе',
-      WAITING_VERIFICATION: 'На проверке',
-      CLOSED: 'Закрыт',
-      REJECTED: 'Отклонен',
-      ESCALATED_TO_CASE: 'Эскалация',
-    };
-    return labels[s] ?? caseStatus;
+    return getCaseStatusLabelRu(caseStatus.trim().toUpperCase());
   };
 
   const getCaseWorkflowStatusColor = (caseStatus: string) => {

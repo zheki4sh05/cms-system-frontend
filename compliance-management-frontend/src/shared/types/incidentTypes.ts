@@ -292,12 +292,16 @@ export interface IncidentReportCase {
   comments: Array<{
     id: string;
     userId: string;
+    firstName?: string;
+    lastName?: string;
     comment: string;
     time: string;
   }>;
   attachments: Array<{
     id: string;
     userId: string;
+    firstName?: string;
+    lastName?: string;
     fileId: string;
     name: string;
     size: number;

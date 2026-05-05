@@ -379,6 +379,8 @@ export class IncidentApi {
         return {
           id: this.stringifyUnknown(commentValue.id),
           userId: this.stringifyUnknown(commentValue.userId),
+          firstName: this.stringifyUnknown(commentValue.firstName),
+          lastName: this.stringifyUnknown(commentValue.lastName),
           comment: this.stringifyUnknown(commentValue.comment),
           time: this.stringifyUnknown(commentValue.time),
         };
@@ -388,6 +390,8 @@ export class IncidentApi {
         return {
           id: this.stringifyUnknown(attachmentValue.id),
           userId: this.stringifyUnknown(attachmentValue.userId),
+          firstName: this.stringifyUnknown(attachmentValue.firstName),
+          lastName: this.stringifyUnknown(attachmentValue.lastName),
           fileId: this.stringifyUnknown(attachmentValue.fileId),
           name: this.stringifyUnknown(attachmentValue.name),
           size: typeof attachmentValue.size === 'number' ? attachmentValue.size : 0,

@@ -79,6 +79,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { CaseApi } from '@shared/lib/api/caseApi';
 import { getFileKindShortLabel } from '@shared/lib/fileDisplay';
+import { getCaseStatusLabelRu } from '@shared/lib/statusLabels';
 import {
   CaseSeverity,
   type Case,
@@ -343,18 +344,7 @@ export const SupervisorCasesPage: FC = observer(() => {
   };
 
   const getStatusLabel = (status: CaseStatus) => {
-    const labels = {
-      OPEN: 'Открыт',
-      IN_PROGRESS: 'В работе',
-      INVESTIGATING: 'Расследование',
-      ACTION_PLAN: 'План действий',
-      ACTION_IN_PROGRESS: 'План в работе',
-      WAITING_VERIFICATION: 'На проверке',
-      CLOSED: 'Закрыт',
-      REJECTED: 'Отклонен',
-      ESCALATED_TO_CASE: 'Эскалация'
-    };
-    return labels[status];
+    return getCaseStatusLabelRu(status);
   };
 
   const stringifyValue = (value: unknown): string => {
@@ -530,12 +520,12 @@ export const SupervisorCasesPage: FC = observer(() => {
                   label="Статус"
                 >
                   <MenuItem value="all">Все статусы</MenuItem>
-                  <MenuItem value="WAITING_VERIFICATION">На проверке</MenuItem>
-                  <MenuItem value="IN_PROGRESS">В работе</MenuItem>
-                  <MenuItem value="INVESTIGATING">Расследование</MenuItem>
-                  <MenuItem value="ACTION_PLAN">План действий</MenuItem>
-                  <MenuItem value="ACTION_IN_PROGRESS">План в работе</MenuItem>
-                  <MenuItem value="CLOSED">Закрыто</MenuItem>
+                  <MenuItem value="WAITING_VERIFICATION">{getCaseStatusLabelRu('WAITING_VERIFICATION')}</MenuItem>
+                  <MenuItem value="IN_PROGRESS">{getCaseStatusLabelRu('IN_PROGRESS')}</MenuItem>
+                  <MenuItem value="INVESTIGATING">{getCaseStatusLabelRu('INVESTIGATING')}</MenuItem>
+                  <MenuItem value="ACTION_PLAN">{getCaseStatusLabelRu('ACTION_PLAN')}</MenuItem>
+                  <MenuItem value="ACTION_IN_PROGRESS">{getCaseStatusLabelRu('ACTION_IN_PROGRESS')}</MenuItem>
+                  <MenuItem value="CLOSED">{getCaseStatusLabelRu('CLOSED')}</MenuItem>
                 </Select>
               </FormControl>
             </Grid>

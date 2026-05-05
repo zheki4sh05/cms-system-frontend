@@ -331,6 +331,31 @@ export class TaskApi {
   }
 
   /**
+   * Подтвердить план действий (POST /api/action-plans/{planId}/confirm)
+   */
+  static async confirmActionPlan(planId: string, comment: string): Promise<SubmitActionPlanResponse> {
+    const response = await apiClient.post<SubmitActionPlanResponse>(
+      `/api/action-plans/${planId}/confirm`,
+      { comment }
+    );
+    return response.data;
+  }
+
+  /**
+   * Вернуть план на доработку (POST /api/action-plans/{planId}/return-for-revision)
+   */
+  static async returnActionPlanForRevision(
+    planId: string,
+    comment: string
+  ): Promise<SubmitActionPlanResponse> {
+    const response = await apiClient.post<SubmitActionPlanResponse>(
+      `/api/action-plans/${planId}/return-for-revision`,
+      { comment }
+    );
+    return response.data;
+  }
+
+  /**
    * Загрузить доказательство выполнения задачи
    */
   static async uploadTaskEvidence(taskId: string, file: File): Promise<void> {

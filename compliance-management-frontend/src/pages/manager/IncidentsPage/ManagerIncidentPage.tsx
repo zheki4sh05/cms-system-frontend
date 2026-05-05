@@ -58,6 +58,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { IncidentApi } from '@shared/lib/api/incidentApi';
+import { getIncidentStatusLabelRu } from '@shared/lib/statusLabels';
 import { RuleApi } from '@shared/lib/api/ruleApi';
 import { useAuthStore } from '@features/auth/useAuthStore';
 import {
@@ -442,16 +443,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
   };
 
   const getStatusLabel = (status: IncidentStatus) => {
-    const labels: Record<IncidentStatus, string> = {
-      NEW: 'Новый',
-      ASSIGNED: 'Начатые',
-      PARTLY_PROGRESS: 'Частичный прогресс',
-      IN_REVIEW: 'В работе',
-      RESOLVED: 'Решен',
-      FALSE_POSITIVE: 'Ложное срабатывание',
-      ESCALATED_TO_CASE: 'Эскалирован в случай',
-    };
-    return labels[status];
+    return getIncidentStatusLabelRu(status);
   };
 
   const getCategoryLabel = (category: IncidentCategory) => {
