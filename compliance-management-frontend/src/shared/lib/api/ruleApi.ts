@@ -3,6 +3,8 @@
 import { apiClient } from './apiClient';
 import type {
   Rule,
+  RulesListItem,
+  RulesListResponse,
   RuleStatistics,
   RuleTriggerHistory,
   CreateRuleRequest,
@@ -32,9 +34,12 @@ export class RuleApi {
   /**
    * Получить все правила
    */
-  static async getAllRules(): Promise<Rule[]> {
-    const response = await apiClient.get<Rule[]>('/rules');
-    return response.data;
+  static async getAllRules(): Promise<RulesListItem[]> {
+    const companyId = this.getCompanyIdForHeader();
+    const response = await apiClient.get<RulesListResponse>('/rules', {
+      headers: companyId ? { CompanyId: companyId } : undefined,
+    });
+    return response.data.items;
   }
 
   /**

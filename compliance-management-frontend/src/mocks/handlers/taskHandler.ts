@@ -160,7 +160,7 @@ export const tasksHandlers = [
     return HttpResponse.json(mockTasks);
   }),
 
-  // GET /tasks/statistics - Статистика по задачам
+  // GET /tasks/statistics - Статистика по задачам (legacy)
   http.get(`${API_BASE_URL}/tasks/statistics`, async () => {
     await delay(300);
     console.log('📊 [MSW] Fetching task statistics');
@@ -175,19 +175,73 @@ export const tasksHandlers = [
       todo: mockTasks.filter(t => t.status === 'TODO').length,
       inProgress: mockTasks.filter(t => t.status === 'IN_PROGRESS').length,
       done: mockTasks.filter(t => t.status === 'DONE').length,
-      blocked: mockTasks.filter(t => t.status === 'BLOCKED').length,
       overdue: mockTasks.filter(t => t.isOverdue).length,
       dueToday: mockTasks.filter(t => {
         const dueDate = new Date(t.dueDate);
         return dueDate >= today && dueDate < tomorrow;
       }).length,
+      dueTodayIds: mockTasks
+        .filter((t) => {
+          const dueDate = new Date(t.dueDate);
+          return dueDate >= today && dueDate < tomorrow && t.status !== 'DONE';
+        })
+        .map((t) => t.id),
       dueTomorrow: mockTasks.filter(t => {
         const dueDate = new Date(t.dueDate);
         return dueDate >= tomorrow && dueDate < new Date(tomorrow.getTime() + 24 * 60 * 60 * 1000);
       }).length,
+      dueTomorrowIds: mockTasks
+        .filter((t) => {
+          const dueDate = new Date(t.dueDate);
+          return (
+            dueDate >= tomorrow &&
+            dueDate < new Date(tomorrow.getTime() + 24 * 60 * 60 * 1000) &&
+            t.status !== 'DONE'
+          );
+        })
+        .map((t) => t.id),
     };
     
     return HttpResponse.json(statistics);
+  }),
+
+  // GET /tasks/my/stats - Статистика задач текущего пользователя
+  http.get(`${API_BASE_URL}/tasks/my/stats`, async () => {
+    await delay(300);
+    console.log('📊 [MSW] Fetching my task stats');
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+    const dayAfterTomorrowStart = new Date(tomorrowStart);
+    dayAfterTomorrowStart.setDate(dayAfterTomorrowStart.getDate() + 1);
+
+    const dueTodayTasks = mockTasks.filter((task) => {
+      const dueDate = new Date(task.dueDate);
+      return task.status !== 'DONE' && dueDate >= todayStart && dueDate < tomorrowStart;
+    });
+    const dueTomorrowTasks = mockTasks.filter((task) => {
+      const dueDate = new Date(task.dueDate);
+      return task.status !== 'DONE' && dueDate >= tomorrowStart && dueDate < dayAfterTomorrowStart;
+    });
+
+    const stats = {
+      total: mockTasks.length,
+      todo: mockTasks.filter((task) => task.status === 'TODO').length,
+      inProgress: mockTasks.filter((task) => task.status === 'IN_PROGRESS').length,
+      done: mockTasks.filter((task) => task.status === 'DONE').length,
+      overdue: mockTasks.filter((task) => {
+        const dueDate = new Date(task.dueDate);
+        return task.status !== 'DONE' && dueDate < now;
+      }).length,
+      dueToday: dueTodayTasks.length,
+      dueTodayIds: dueTodayTasks.map((task) => task.id),
+      dueTomorrow: dueTomorrowTasks.length,
+      dueTomorrowIds: dueTomorrowTasks.map((task) => task.id),
+    };
+
+    return HttpResponse.json(stats);
   }),
 
   // GET /tasks/:taskId - Получить задачу по ID

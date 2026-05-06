@@ -126,6 +126,9 @@ export const ManagerTasksPage: FC = observer(() => {
   const [incidentPreviewOpen, setIncidentPreviewOpen] = useState(false);
   const [incidentViewData, setIncidentViewData] = useState<IncidentViewDto | null>(null);
   const [incidentPreviewLoading, setIncidentPreviewLoading] = useState(false);
+  const [deadlineTasksDialogOpen, setDeadlineTasksDialogOpen] = useState(false);
+  const [deadlineTasksTitle, setDeadlineTasksTitle] = useState('');
+  const [deadlineTaskIds, setDeadlineTaskIds] = useState<string[]>([]);
 
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   const [editPlanTitle, setEditPlanTitle] = useState('');
@@ -439,6 +442,28 @@ export const ManagerTasksPage: FC = observer(() => {
     setTaskDialogOpen(true);
   };
 
+  const handleOpenDeadlineTasks = (title: string, taskIds: string[]) => {
+    setDeadlineTasksTitle(title);
+    setDeadlineTaskIds(taskIds);
+    setDeadlineTasksDialogOpen(true);
+  };
+
+  const handleOpenDeadlineTaskById = async (taskId: string) => {
+    const existingTask = tasks.find((task) => task.id === taskId);
+    if (existingTask) {
+      handleOpenTask(existingTask);
+      setDeadlineTasksDialogOpen(false);
+      return;
+    }
+    try {
+      const loadedTask = await TaskApi.getTask(taskId);
+      handleOpenTask(loadedTask);
+      setDeadlineTasksDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to load task by id:', error);
+    }
+  };
+
   const handleOpenTaskDetails = async (task: Task) => {
     setSelectedTask(task);
     setDetailIncident(null);
@@ -739,6 +764,9 @@ export const ManagerTasksPage: FC = observer(() => {
   const todoTasks = filteredTasks.filter(t => t.status === 'TODO');
   const inProgressTasks = filteredTasks.filter(t => t.status === 'IN_PROGRESS');
   const doneTasks = filteredTasks.filter(t => t.status === 'DONE');
+  const deadlineTasks = deadlineTaskIds
+    .map((taskId) => tasks.find((task) => task.id === taskId))
+    .filter((task): task is Task => Boolean(task));
 
   if (loading) {
     return (
@@ -808,6 +836,15 @@ export const ManagerTasksPage: FC = observer(() => {
                   <Typography variant="h4" color="warning.main">{statistics.dueToday}</Typography>
                   <Typography variant="body2" color="text.secondary">Сегодня</Typography>
                 </CardContent>
+                <CardActions sx={{ justifyContent: 'center', pt: 0, pb: 2 }}>
+                  <Button
+                    size="small"
+                    onClick={() => handleOpenDeadlineTasks('Задачи на сегодня', statistics.dueTodayIds)}
+                    disabled={statistics.dueTodayIds.length === 0}
+                  >
+                    Показать
+                  </Button>
+                </CardActions>
               </Card>
             </Grid>
             <Grid size={{xs: 12, sm:6, md:2}}>
@@ -816,6 +853,15 @@ export const ManagerTasksPage: FC = observer(() => {
                   <Typography variant="h4" color="info.main">{statistics.dueTomorrow}</Typography>
                   <Typography variant="body2" color="text.secondary">Завтра</Typography>
                 </CardContent>
+                <CardActions sx={{ justifyContent: 'center', pt: 0, pb: 2 }}>
+                  <Button
+                    size="small"
+                    onClick={() => handleOpenDeadlineTasks('Задачи на завтра', statistics.dueTomorrowIds)}
+                    disabled={statistics.dueTomorrowIds.length === 0}
+                  >
+                    Показать
+                  </Button>
+                </CardActions>
               </Card>
             </Grid>
           </Grid>
@@ -1996,6 +2042,46 @@ export const ManagerTasksPage: FC = observer(() => {
               </DialogActions>
             </>
           )}
+        </Dialog>
+
+        <Dialog
+          open={deadlineTasksDialogOpen}
+          onClose={() => setDeadlineTasksDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>{deadlineTasksTitle}</DialogTitle>
+          <DialogContent>
+            {deadlineTaskIds.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                Нет задач для отображения.
+              </Typography>
+            ) : (
+              <List>
+                {deadlineTaskIds.map((taskId) => {
+                  const task = deadlineTasks.find((item) => item.id === taskId);
+                  return (
+                    <ListItem
+                      key={taskId}
+                      secondaryAction={
+                        <Button size="small" onClick={() => void handleOpenDeadlineTaskById(taskId)}>
+                          Открыть
+                        </Button>
+                      }
+                    >
+                      <ListItemText
+                        primary={task?.title || `Задача ${taskId}`}
+                        secondary={task?.dueDate ? `Срок: ${new Date(task.dueDate).toLocaleDateString('ru-RU')}` : taskId}
+                      />
+                    </ListItem>
+                  );
+                })}
+              </List>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeadlineTasksDialogOpen(false)}>Закрыть</Button>
+          </DialogActions>
         </Dialog>
       </Box>
     </Container>

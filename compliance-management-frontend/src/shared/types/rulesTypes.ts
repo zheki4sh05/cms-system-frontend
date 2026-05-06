@@ -172,3 +172,30 @@ export interface TestRuleResponse {
   unmatchedConditions: string[];
   executionTime: number;
 }
+
+export interface RuleRiskObject {
+  id: string;
+  uuid: string;
+  code: string;
+  name: string;
+  status: string;
+  updatedAt: string;
+  definition: string;
+}
+
+export interface RulesListItem {
+  id: string;
+  name: string;
+  condition: string;
+  action: string;
+  categoryId: string;
+  categoryLabel: string;
+  priority: string;
+  enabled: boolean;
+  riskObjectId: string;
+  riskObject: RuleRiskObject;
+}
+
+export interface RulesListResponse {
+  items: RulesListItem[];
+}

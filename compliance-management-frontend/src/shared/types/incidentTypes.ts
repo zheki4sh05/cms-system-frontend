@@ -137,25 +137,24 @@ export interface Incident {
 }
 
 export interface IncidentStatistics {
-  total: number;
   new: number;
   assigned: number;
   inReview: number;
   resolved: number;
-  falsePositive: number;
-  escalatedToCase: number;
-  
+
   bySeverity: {
     low: number;
     medium: number;
     high: number;
-    critical: number;
+    critical?: number;
   };
-  
-  byCategory: {
-    [key in IncidentCategory]: number;
-  };
-  
+
+  byCategory: Array<{
+    categoryId: string | null;
+    categoryName: string;
+    incidentCount: number;
+  }>;
+
   avgResolutionTime: number; // В часах
 }
 

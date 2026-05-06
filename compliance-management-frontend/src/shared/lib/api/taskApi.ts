@@ -220,8 +220,22 @@ export class TaskApi {
    * Получить статистику по задачам
    */
   static async getTaskStatistics(): Promise<TaskStatistics> {
-    const response = await apiClient.get<TaskStatistics>('/tasks/statistics');
-    return response.data;
+    const response = await apiClient.get<unknown>('/tasks/my/stats');
+    const payload = (response.data ?? {}) as Record<string, unknown>;
+    const rawDueTodayIds = Array.isArray(payload.dueTodayIds) ? payload.dueTodayIds : [];
+    const rawDueTomorrowIds = Array.isArray(payload.dueTomorrowIds) ? payload.dueTomorrowIds : [];
+
+    return {
+      total: typeof payload.total === 'number' ? payload.total : 0,
+      todo: typeof payload.todo === 'number' ? payload.todo : 0,
+      inProgress: typeof payload.inProgress === 'number' ? payload.inProgress : 0,
+      done: typeof payload.done === 'number' ? payload.done : 0,
+      overdue: typeof payload.overdue === 'number' ? payload.overdue : 0,
+      dueToday: typeof payload.dueToday === 'number' ? payload.dueToday : 0,
+      dueTodayIds: rawDueTodayIds.filter((id): id is string => typeof id === 'string'),
+      dueTomorrow: typeof payload.dueTomorrow === 'number' ? payload.dueTomorrow : 0,
+      dueTomorrowIds: rawDueTomorrowIds.filter((id): id is string => typeof id === 'string'),
+    };
   }
 
   /**

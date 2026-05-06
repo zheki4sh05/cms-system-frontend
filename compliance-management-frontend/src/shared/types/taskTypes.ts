@@ -172,8 +172,9 @@ export interface TaskStatistics {
   todo: number;
   inProgress: number;
   done: number;
-  blocked: number;
   overdue: number;
   dueToday: number;
+  dueTodayIds: string[];
   dueTomorrow: number;
+  dueTomorrowIds: string[];
 }

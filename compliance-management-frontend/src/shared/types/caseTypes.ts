@@ -116,6 +116,20 @@ export interface CaseStatistics {
   avgResolutionTime: number; // В часах
 }
 
+export interface ManagerCaseStatistics {
+  total: number;
+  ASSIGNED: number;
+  ACTION_PLAN: number;
+  OPEN: number;
+  INVESTIGATING: number;
+  WAITING_VERIFICATION: number;
+  ACTION_IN_PROGRESS: number;
+  IN_PROGRESS: number;
+  REJECTED: number;
+  CLOSED: number;
+  avgResolutionTime: number;
+}
+
 // Обновить src/shared/types/case.types.ts - добавить новые поля
 
 export interface VerificationDecision {

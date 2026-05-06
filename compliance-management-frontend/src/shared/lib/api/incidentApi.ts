@@ -155,8 +155,39 @@ export class IncidentApi {
    * Получить статистику по инцидентам
    */
   static async getIncidentStatistics(): Promise<IncidentStatistics> {
-    const response = await apiClient.get<IncidentStatistics>('/incidents/statistics');
-    return response.data;
+    const response = await apiClient.get<unknown>('/api/incidents/my/stats');
+    const payload = (response.data ?? {}) as Record<string, unknown>;
+
+    const rawBySeverity =
+      payload.bySeverity && typeof payload.bySeverity === 'object'
+        ? (payload.bySeverity as Record<string, unknown>)
+        : {};
+    const rawByCategory = Array.isArray(payload.byCategory) ? payload.byCategory : [];
+
+    return {
+      new: typeof payload.new === 'number' ? payload.new : 0,
+      assigned: typeof payload.assigned === 'number' ? payload.assigned : 0,
+      inReview: typeof payload.inReview === 'number' ? payload.inReview : 0,
+      resolved: typeof payload.resolved === 'number' ? payload.resolved : 0,
+      bySeverity: {
+        low: typeof rawBySeverity.low === 'number' ? rawBySeverity.low : 0,
+        medium: typeof rawBySeverity.medium === 'number' ? rawBySeverity.medium : 0,
+        high: typeof rawBySeverity.high === 'number' ? rawBySeverity.high : 0,
+        critical: typeof rawBySeverity.critical === 'number' ? rawBySeverity.critical : 0,
+      },
+      byCategory: rawByCategory.map((entry) => {
+        const value = (entry ?? {}) as Record<string, unknown>;
+        return {
+          categoryId: typeof value.categoryId === 'string' ? value.categoryId : null,
+          categoryName:
+            typeof value.categoryName === 'string' && value.categoryName.length > 0
+              ? value.categoryName
+              : 'Без категории',
+          incidentCount: typeof value.incidentCount === 'number' ? value.incidentCount : 0,
+        };
+      }),
+      avgResolutionTime: typeof payload.avgResolutionTime === 'number' ? payload.avgResolutionTime : 0,
+    };
   }
 
   /**

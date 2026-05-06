@@ -3,6 +3,7 @@
 import { http, HttpResponse, delay } from 'msw';
 import type {
   Rule,
+  RulesListResponse,
   RuleStatistics,
   RuleTriggerHistory,
   CreateRuleRequest,
@@ -811,7 +812,32 @@ export const rulesHandlers = [
   http.get(`${API_BASE_URL}/rules`, async () => {
     await delay(500);
     console.log('📋 [MSW] Fetching all rules');
-    return HttpResponse.json(mockRules);
+    const response: RulesListResponse = {
+      items: mockRules.map((rule) => ({
+        id: rule.id,
+        name: rule.name,
+        condition: rule.conditions
+          .map((condition) => `${condition.field} ${condition.operator} ${String(condition.value)}`)
+          .join('; '),
+        action: rule.actions.map((action) => action.type).join(', '),
+        categoryId: rule.category,
+        categoryLabel: rule.category,
+        priority: String(rule.priority),
+        enabled: rule.isActive,
+        riskObjectId: `risk-${rule.id}`,
+        riskObject: {
+          id: `risk-${rule.id}`,
+          uuid: `risk-${rule.id}`,
+          code: rule.id,
+          name: rule.name,
+          status: rule.status,
+          updatedAt: rule.updatedAt,
+          definition: rule.description,
+        },
+      })),
+    };
+
+    return HttpResponse.json(response);
   }),
 
   // GET /rules/statistics - Получить статистику правил

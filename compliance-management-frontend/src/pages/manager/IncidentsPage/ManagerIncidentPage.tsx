@@ -584,22 +584,20 @@ export const ManagerIncidentsPage: FC = observer(() => {
               </Card>
             </Grid>
             <Grid size={{xs:12, sm:6, md: 3}}>
-              <Card sx={{ cursor: 'pointer' }} onClick={() => setTabValue(2)}>
+              <Card sx={{ cursor: 'pointer' }} onClick={() => setTabValue(1)}>
                 <CardContent sx={{ textAlign: 'center' }}>
                   <StartIcon sx={{ fontSize: 40, color: 'warning.main' }} />
-                  <Typography variant="h5" sx={{ mt: 2 }}>
-                    {statistics.assigned + statistics.inReview}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">В работе</Typography>
+                  <Typography variant="h5" sx={{ mt: 2 }}>{statistics.assigned}</Typography>
+                  <Typography variant="body2" color="text.secondary">Назначено</Typography>
                 </CardContent>
               </Card>
             </Grid>
             <Grid size={{xs:12, sm:6, md: 3}}>
-              <Card sx={{ cursor: 'pointer' }} onClick={() => setTabValue(3)}>
+              <Card sx={{ cursor: 'pointer' }} onClick={() => setTabValue(2)}>
                 <CardContent sx={{ textAlign: 'center' }}>
-                  <CheckIcon sx={{ fontSize: 40, color: 'success.main' }} />
-                  <Typography variant="h5" sx={{ mt: 2 }}>{statistics.resolved}</Typography>
-                  <Typography variant="body2" color="text.secondary">Решено</Typography>
+                  <InfoIcon sx={{ fontSize: 40, color: 'info.main' }} />
+                  <Typography variant="h5" sx={{ mt: 2 }}>{statistics.inReview}</Typography>
+                  <Typography variant="body2" color="text.secondary">На проверке</Typography>
                 </CardContent>
               </Card>
             </Grid>
@@ -619,12 +617,44 @@ export const ManagerIncidentsPage: FC = observer(() => {
         {statistics && (
           <Paper sx={{ p: 2, mb: 3 }}>
             <Typography variant="subtitle2" gutterBottom>
+              Статусы инцидентов
+            </Typography>
+            <Grid container spacing={2} sx={{ mb: 2 }}>
+              <Grid size={{ xs: 6, md: 3 }}>
+                <Chip label={`Новые: ${statistics.new}`} color="error" size="small" sx={{ width: '100%' }} />
+              </Grid>
+              <Grid size={{ xs: 6, md: 3 }}>
+                <Chip
+                  label={`Назначено: ${statistics.assigned}`}
+                  color="warning"
+                  size="small"
+                  sx={{ width: '100%' }}
+                />
+              </Grid>
+              <Grid size={{ xs: 6, md: 3 }}>
+                <Chip
+                  label={`На проверке: ${statistics.inReview}`}
+                  color="info"
+                  size="small"
+                  sx={{ width: '100%' }}
+                />
+              </Grid>
+              <Grid size={{ xs: 6, md: 3 }}>
+                <Chip
+                  label={`Решено: ${statistics.resolved}`}
+                  color="success"
+                  size="small"
+                  sx={{ width: '100%' }}
+                />
+              </Grid>
+            </Grid>
+            <Typography variant="subtitle2" gutterBottom>
               Распределение по критичности
             </Typography>
             <Grid container spacing={2}>
               <Grid size={{xs:3}}>
                 <Chip
-                  label={`Критично: ${statistics.bySeverity.critical}`}
+                  label={`Критично: ${statistics.bySeverity.critical ?? 0}`}
                   color="error"
                   size="small"
                   sx={{ width: '100%' }}
@@ -654,6 +684,32 @@ export const ManagerIncidentsPage: FC = observer(() => {
                   sx={{ width: '100%' }}
                 />
               </Grid>
+            </Grid>
+          </Paper>
+        )}
+
+        {statistics && (
+          <Paper sx={{ p: 2, mb: 3 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Распределение по категориям
+            </Typography>
+            <Grid container spacing={2}>
+              {statistics.byCategory.map((category) => (
+                <Grid key={category.categoryId || category.categoryName} size={{ xs: 12, sm: 6, md: 4 }}>
+                  <Chip
+                    label={`${category.categoryName}: ${category.incidentCount}`}
+                    variant="outlined"
+                    sx={{ width: '100%' }}
+                  />
+                </Grid>
+              ))}
+              {statistics.byCategory.length === 0 && (
+                <Grid size={{ xs: 12 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Нет данных по категориям
+                  </Typography>
+                </Grid>
+              )}
             </Grid>
           </Paper>
         )}

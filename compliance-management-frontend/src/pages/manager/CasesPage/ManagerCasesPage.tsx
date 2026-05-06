@@ -71,7 +71,7 @@ import type {
   CasePriority,
   CaseComment,
   CaseAttachment,
-  CaseStatistics,
+  ManagerCaseStatistics,
   CaseViewItem,
 } from '@shared/types/caseTypes';
 
@@ -95,7 +95,7 @@ export const ManagerCasesPage: FC = observer(() => {
   const authStore = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [cases, setCases] = useState<Case[]>([]);
-  const [statistics, setStatistics] = useState<CaseStatistics | null>(null);
+  const [statistics, setStatistics] = useState<ManagerCaseStatistics | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -133,7 +133,7 @@ export const ManagerCasesPage: FC = observer(() => {
       setCases(casesData);
 
       try {
-        const statsData = await CaseApi.getCaseStatistics();
+        const statsData = await CaseApi.getMyCaseStatistics();
         setStatistics(statsData);
       } catch (statsError) {
         console.error('Failed to load case statistics:', statsError);
@@ -462,13 +462,6 @@ export const ManagerCasesPage: FC = observer(() => {
           <Typography variant="h4">
             Случаи
           </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => {/* TODO: Create case dialog */}}
-          >
-            Создать случай
-          </Button>
         </Box>
 
         {/* Статистика */}
@@ -477,7 +470,15 @@ export const ManagerCasesPage: FC = observer(() => {
             <Grid size={{xs: 12, sm: 6, md: 2}}>
               <Card>
                 <CardContent sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4" color="primary">{statistics.open}</Typography>
+                  <Typography variant="h4" color="primary">{statistics.total}</Typography>
+                  <Typography variant="body2" color="text.secondary">Всего</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid size={{xs: 12, sm: 6, md: 2}}>
+              <Card>
+                <CardContent sx={{ textAlign: 'center' }}>
+                  <Typography variant="h4" color="info.main">{statistics.OPEN}</Typography>
                   <Typography variant="body2" color="text.secondary">Открыто</Typography>
                 </CardContent>
               </Card>
@@ -485,15 +486,15 @@ export const ManagerCasesPage: FC = observer(() => {
             <Grid size={{xs: 12, sm: 6, md: 2}}>
               <Card>
                 <CardContent sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4" color="warning.main">{statistics.inProgress}</Typography>
-                  <Typography variant="body2" color="text.secondary">В работе</Typography>
+                  <Typography variant="h4" color="warning.main">{statistics.ASSIGNED}</Typography>
+                  <Typography variant="body2" color="text.secondary">Назначено</Typography>
                 </CardContent>
               </Card>
             </Grid>
             <Grid size={{xs: 12, sm: 6, md: 2}}>
               <Card>
                 <CardContent sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4" color="info.main">{statistics.investigation}</Typography>
+                  <Typography variant="h4" color="secondary.main">{statistics.INVESTIGATING}</Typography>
                   <Typography variant="body2" color="text.secondary">Расследование</Typography>
                 </CardContent>
               </Card>
@@ -501,15 +502,7 @@ export const ManagerCasesPage: FC = observer(() => {
             <Grid size={{xs: 12, sm: 6, md: 2}}>
               <Card>
                 <CardContent sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4" color="secondary.main">{statistics.pendingVerification}</Typography>
-                  <Typography variant="body2" color="text.secondary">На проверке</Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid size={{xs: 12, sm: 6, md: 2}}>
-              <Card>
-                <CardContent sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4" color="success.main">{statistics.closed}</Typography>
+                  <Typography variant="h4" color="success.main">{statistics.CLOSED}</Typography>
                   <Typography variant="body2" color="text.secondary">Закрыто</Typography>
                 </CardContent>
               </Card>
@@ -523,6 +516,51 @@ export const ManagerCasesPage: FC = observer(() => {
               </Card>
             </Grid>
           </Grid>
+        )}
+
+        {statistics && (
+          <Paper sx={{ p: 2, mb: 3 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Статусы случаев
+            </Typography>
+            <Grid container spacing={1.5}>
+              <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                <Chip
+                  label={`${getCaseStatusLabelRu('IN_PROGRESS')}: ${statistics.IN_PROGRESS}`}
+                  size="small"
+                  sx={{ width: '100%' }}
+                />
+              </Grid>
+              <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                <Chip
+                  label={`${getCaseStatusLabelRu('ACTION_PLAN')}: ${statistics.ACTION_PLAN}`}
+                  size="small"
+                  sx={{ width: '100%' }}
+                />
+              </Grid>
+              <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                <Chip
+                  label={`${getCaseStatusLabelRu('ACTION_IN_PROGRESS')}: ${statistics.ACTION_IN_PROGRESS}`}
+                  size="small"
+                  sx={{ width: '100%' }}
+                />
+              </Grid>
+              <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                <Chip
+                  label={`${getCaseStatusLabelRu('WAITING_VERIFICATION')}: ${statistics.WAITING_VERIFICATION}`}
+                  size="small"
+                  sx={{ width: '100%' }}
+                />
+              </Grid>
+              <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                <Chip
+                  label={`${getCaseStatusLabelRu('REJECTED')}: ${statistics.REJECTED}`}
+                  size="small"
+                  sx={{ width: '100%' }}
+                />
+              </Grid>
+            </Grid>
+          </Paper>
         )}
 
         {/* Поиск */}

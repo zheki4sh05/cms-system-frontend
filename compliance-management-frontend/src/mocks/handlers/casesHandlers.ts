@@ -381,6 +381,28 @@ export const casesHandlers = [
     return HttpResponse.json(statistics);
   }),
 
+  // GET /cases/my/stats - Статистика по случаям текущего менеджера
+  http.get(`${API_BASE_URL}/cases/my/stats`, async () => {
+    await delay(300);
+    console.log('📊 [MSW] Fetching my case stats');
+
+    const stats = {
+      total: mockCases.length,
+      ASSIGNED: mockCases.filter((c) => c.status === 'ASSIGNED').length,
+      ACTION_PLAN: mockCases.filter((c) => c.status === 'ACTION_PLAN').length,
+      OPEN: mockCases.filter((c) => c.status === 'OPEN').length,
+      INVESTIGATING: mockCases.filter((c) => c.status === 'INVESTIGATING').length,
+      WAITING_VERIFICATION: mockCases.filter((c) => c.status === 'WAITING_VERIFICATION').length,
+      ACTION_IN_PROGRESS: mockCases.filter((c) => c.status === 'ACTION_IN_PROGRESS').length,
+      IN_PROGRESS: mockCases.filter((c) => c.status === 'IN_PROGRESS').length,
+      REJECTED: mockCases.filter((c) => c.status === 'REJECTED').length,
+      CLOSED: mockCases.filter((c) => c.status === 'CLOSED').length,
+      avgResolutionTime: 48,
+    };
+
+    return HttpResponse.json(stats);
+  }),
+
   // GET /cases/:caseId - Получить случай по ID
   http.get(`${API_BASE_URL}/cases/:caseId`, async ({ params }) => {
     await delay(300);

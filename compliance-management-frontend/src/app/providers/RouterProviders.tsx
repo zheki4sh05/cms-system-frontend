@@ -33,6 +33,7 @@ import { ExecutiveHelpPage } from '@pages/help/ExecutiveHelpPage';
 import { ManagerRulesPage } from '@pages/manager/RulesPage/RulesPage';
 import { ArchivePage } from '@pages/archive/ArchivePage';
 import { IncidentsAndCasesPage } from '@pages/shared/IncidentsAndCasesPage/IncidentsAndCasesPage';
+import { RulesPage } from '@pages/shared/RulesPage/RulesPage';
 
 export const RouterProvider: FC = observer(() => {
   return (
@@ -95,6 +96,7 @@ export const RouterProvider: FC = observer(() => {
                   <Route path="dashboard" element={<ExecutiveDashboardPage />} />
                   <Route path="incidents-cases" element={<IncidentsAndCasesPage />} />
                   <Route path="reports" element={<Navigate to="../incidents-cases" replace />} />
+                  <Route path="rules" element={<RulesPage />} />
                   <Route path="archive" element={<ArchivePage />} />
                   <Route path="help" element={<ExecutiveHelpPage />} />
                 </Routes>

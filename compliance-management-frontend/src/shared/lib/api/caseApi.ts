@@ -9,6 +9,7 @@ import type {
   UpdateCaseRequest,
   UpdateInvestigationRequest,
   CaseStatistics,
+  ManagerCaseStatistics,
   CaseVerificationDetails,
   VerificationDecision,
   CaseViewItem,
@@ -149,6 +150,29 @@ export class CaseApi {
   static async getCaseStatistics(): Promise<CaseStatistics> {
     const response = await apiClient.get<CaseStatistics>('/cases/statistics');
     return response.data;
+  }
+
+  /**
+   * Получить статистику по случаям текущего менеджера
+   */
+  static async getMyCaseStatistics(): Promise<ManagerCaseStatistics> {
+    const response = await apiClient.get<unknown>('/cases/my/stats');
+    const payload = (response.data ?? {}) as Record<string, unknown>;
+
+    return {
+      total: typeof payload.total === 'number' ? payload.total : 0,
+      ASSIGNED: typeof payload.ASSIGNED === 'number' ? payload.ASSIGNED : 0,
+      ACTION_PLAN: typeof payload.ACTION_PLAN === 'number' ? payload.ACTION_PLAN : 0,
+      OPEN: typeof payload.OPEN === 'number' ? payload.OPEN : 0,
+      INVESTIGATING: typeof payload.INVESTIGATING === 'number' ? payload.INVESTIGATING : 0,
+      WAITING_VERIFICATION:
+        typeof payload.WAITING_VERIFICATION === 'number' ? payload.WAITING_VERIFICATION : 0,
+      ACTION_IN_PROGRESS: typeof payload.ACTION_IN_PROGRESS === 'number' ? payload.ACTION_IN_PROGRESS : 0,
+      IN_PROGRESS: typeof payload.IN_PROGRESS === 'number' ? payload.IN_PROGRESS : 0,
+      REJECTED: typeof payload.REJECTED === 'number' ? payload.REJECTED : 0,
+      CLOSED: typeof payload.CLOSED === 'number' ? payload.CLOSED : 0,
+      avgResolutionTime: typeof payload.avgResolutionTime === 'number' ? payload.avgResolutionTime : 0,
+    };
   }
 
   /**

@@ -687,39 +687,74 @@ export const incidentsHandlers = [
   http.get(`${API_BASE_URL}/incidents/my`, handleGetMyIncidents),
   http.get(`${API_ROOT}/api/incidents/my`, handleGetMyIncidents),
 
-  // GET /incidents/statistics - Статистика по инцидентам
+  // GET /incidents/statistics и /api/incidents/my/stats - Статистика по инцидентам
   http.get(`${API_BASE_URL}/incidents/statistics`, async () => {
     await delay(300);
     console.log('📊 [MSW] Fetching incident statistics');
     
     const statistics: IncidentStatistics = {
-      total: mockIncidents.length,
       new: mockIncidents.filter(i => i.status === 'NEW').length,
       assigned: mockIncidents.filter(
         i => i.status === 'ASSIGNED' || i.status === 'PARTLY_PROGRESS'
       ).length,
       inReview: mockIncidents.filter(i => i.status === 'IN_REVIEW').length,
       resolved: mockIncidents.filter(i => i.status === 'RESOLVED').length,
-      falsePositive: mockIncidents.filter(i => i.status === 'FALSE_POSITIVE').length,
-      escalatedToCase: mockIncidents.filter(i => i.status === 'ESCALATED_TO_CASE').length,
       bySeverity: {
         low: mockIncidents.filter(i => i.severity === 'LOW').length,
         medium: mockIncidents.filter(i => i.severity === 'MEDIUM').length,
         high: mockIncidents.filter(i => i.severity === 'HIGH').length,
         critical: mockIncidents.filter(i => i.severity === 'CRITICAL').length,
       },
-      byCategory: {
-        FINANCIAL: mockIncidents.filter(i => i.category === 'FINANCIAL').length,
-        VENDOR: mockIncidents.filter(i => i.category === 'VENDOR').length,
-        COMPLIANCE: mockIncidents.filter(i => i.category === 'COMPLIANCE').length,
-        LOGISTICS: mockIncidents.filter(i => i.category === 'LOGISTICS').length,
-        DATA_QUALITY: mockIncidents.filter(i => i.category === 'DATA_QUALITY').length,
-        ETHICS: mockIncidents.filter(i => i.category === 'ETHICS').length,
-      },
+      byCategory: [],
       avgResolutionTime: 36, // В часах
     };
     
     return HttpResponse.json(statistics);
+  }),
+
+  http.get(`${API_ROOT}/api/incidents/my/stats`, async () => {
+    await delay(300);
+    console.log('📊 [MSW] Fetching my incident stats');
+
+    const categoryMap = new Map<string, { categoryId: string | null; categoryName: string; incidentCount: number }>();
+
+    mockIncidents.forEach((incident) => {
+      const rawCategoryId =
+        typeof incident.categoryId === 'string' && incident.categoryId.length > 0
+          ? incident.categoryId
+          : null;
+      const categoryName =
+        typeof incident.categoryName === 'string' && incident.categoryName.length > 0
+          ? incident.categoryName
+          : 'Без категории';
+      const key = rawCategoryId || `NO_CATEGORY:${categoryName}`;
+      const current = categoryMap.get(key);
+      if (current) {
+        current.incidentCount += 1;
+      } else {
+        categoryMap.set(key, {
+          categoryId: rawCategoryId,
+          categoryName,
+          incidentCount: 1,
+        });
+      }
+    });
+
+    const stats = {
+      new: mockIncidents.filter((i) => i.status === 'NEW').length,
+      assigned: mockIncidents.filter((i) => i.status === 'ASSIGNED' || i.status === 'PARTLY_PROGRESS').length,
+      inReview: mockIncidents.filter((i) => i.status === 'IN_REVIEW').length,
+      resolved: mockIncidents.filter((i) => i.status === 'RESOLVED').length,
+      bySeverity: {
+        low: mockIncidents.filter((i) => i.severity === 'LOW').length,
+        medium: mockIncidents.filter((i) => i.severity === 'MEDIUM').length,
+        high: mockIncidents.filter((i) => i.severity === 'HIGH').length,
+      },
+      byCategory: Array.from(categoryMap.values()),
+      avgResolutionTime: 36,
+    };
+
+    return HttpResponse.json(stats);
   }),
 
   // GET /incidents/:incidentId - Получить инцидент по ID

@@ -130,6 +130,13 @@ export const navigationItems: NavigationItem[] = [
     roles: [UserRoleValues.EXECUTIVE],
   },
   {
+    id: 'executive-rules',
+    label: 'Правила',
+    path: '/executive/rules',
+    icon: RuleOutlined,
+    roles: [UserRoleValues.EXECUTIVE],
+  },
+  {
     id: 'executive-help',
     label: 'Помощь',
     path: '/executive/help',
