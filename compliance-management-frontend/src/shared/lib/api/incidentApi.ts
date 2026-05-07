@@ -19,10 +19,14 @@ import type {
   IncidentReportItem,
   IncidentReportFinding,
   IncidentReportCase,
+  IncidentSummaryStats,
 } from '@shared/types/incidentTypes';
 import type { Case } from '@shared/types/caseTypes';
 
 export class IncidentApi {
+  private static readonly workflowServiceBaseUrl =
+    import.meta.env.VITE_WORKFLOW_SERVICE_BASE_URL || 'http://localhost:8081';
+
   private static stringifyUnknown(value: unknown): string {
     if (typeof value === 'string') return value;
     if (typeof value === 'number' || typeof value === 'boolean') return String(value);
@@ -484,9 +488,23 @@ export class IncidentApi {
     };
   }
 
-  static async getIncidentReports(page: number, limit: number): Promise<IncidentReportsPageResult> {
+  static async getIncidentReports(
+    page: number,
+    limit: number,
+    filters?: { incidentId?: string; documentId?: string; status?: string }
+  ): Promise<IncidentReportsPageResult> {
+    const incidentId = filters?.incidentId?.trim();
+    const documentId = filters?.documentId?.trim();
+    const status = filters?.status?.trim();
+
     const response = await apiClient.get<unknown>('/api/incidents/reports', {
-      params: { page, limit },
+      params: {
+        page,
+        limit,
+        ...(incidentId ? { incidentId } : {}),
+        ...(documentId ? { documentId } : {}),
+        ...(status ? { status } : {}),
+      },
     });
     const payload = (response.data ?? {}) as Record<string, unknown>;
     const items = Array.isArray(payload.items)
@@ -498,6 +516,17 @@ export class IncidentApi {
       limit: typeof payload.limit === 'number' ? payload.limit : limit,
       total: typeof payload.total === 'number' ? payload.total : items.length,
       totalPages: typeof payload.totalPages === 'number' ? payload.totalPages : 0,
+    };
+  }
+
+  static async getIncidentSummaryStats(): Promise<IncidentSummaryStats> {
+    const response = await apiClient.get<unknown>(`${this.workflowServiceBaseUrl}/api/incidents/my/stats`);
+    const payload = (response.data ?? {}) as Record<string, unknown>;
+
+    return {
+      totalIncidents: typeof payload.totalIncidents === 'number' ? payload.totalIncidents : 0,
+      totalFindings: typeof payload.totalFindings === 'number' ? payload.totalFindings : 0,
+      totalCases: typeof payload.totalCases === 'number' ? payload.totalCases : 0,
     };
   }
 }

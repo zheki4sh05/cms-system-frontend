@@ -25,7 +25,9 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   TablePagination,
   TextField,
@@ -33,6 +35,7 @@ import {
 } from '@mui/material';
 import {
   AttachFile as AttachFileIcon,
+  ContentCopy as ContentCopyIcon,
   DeleteOutline as DeleteOutlineIcon,
   ExpandMore as ExpandMoreIcon,
   FolderOpen as CaseIcon,
@@ -47,9 +50,20 @@ import { CaseApi } from '@shared/lib/api/caseApi';
 import { IncidentApi } from '@shared/lib/api/incidentApi';
 import { getCaseStatusLabelRu, getIncidentStatusLabelRu } from '@shared/lib/statusLabels';
 import { TaskApi } from '@shared/lib/api/taskApi';
-import type { IncidentReportCase, IncidentReportItem, IncidentReportsPageResult } from '@shared/types/incidentTypes';
+import type {
+  IncidentReportCase,
+  IncidentReportItem,
+  IncidentReportsPageResult,
+  IncidentSummaryStats,
+} from '@shared/types/incidentTypes';
 
 const DEFAULT_PAGE_SIZE = 10;
+const INCIDENT_STATUS_OPTIONS = [
+  'OPEN',
+  'PARTLY_PROGRESS',
+  'IN_PROGRESS',
+  'RESOLVED',
+] as const;
 
 const getStatusChipColor = (
   status: string
@@ -123,6 +137,14 @@ const formatFileSize = (size: number): string => {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const copyToClipboard = async (value: string): Promise<void> => {
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch (copyError) {
+    console.error('Failed to copy incident id:', copyError);
+  }
+};
+
 const renderCaseMeta = (caseItem: IncidentReportCase) => {
   const commentsCount = caseItem.comments.length;
   const attachmentsCount = caseItem.attachments.length;
@@ -144,7 +166,12 @@ export const IncidentsAndCasesPage: FC = observer(() => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<IncidentReportsPageResult | null>(null);
-  const [search, setSearch] = useState('');
+  const [summaryStats, setSummaryStats] = useState<IncidentSummaryStats | null>(null);
+  const [searchIncidentId, setSearchIncidentId] = useState('');
+  const [searchDocumentId, setSearchDocumentId] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
+  const [appliedIncidentId, setAppliedIncidentId] = useState('');
+  const [appliedDocumentId, setAppliedDocumentId] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_PAGE_SIZE);
   const [selectedIncidentReport, setSelectedIncidentReport] = useState<IncidentReportItem | null>(null);
@@ -161,8 +188,21 @@ export const IncidentsAndCasesPage: FC = observer(() => {
 
   const refreshReports = useCallback(async (keepSelectedIncidentId?: string) => {
     try {
-      const response = await IncidentApi.getIncidentReports(page, rowsPerPage);
+      const response = await IncidentApi.getIncidentReports(page, rowsPerPage, {
+        incidentId: appliedIncidentId,
+        documentId: appliedDocumentId,
+        status: selectedStatus,
+      });
       setData(response);
+
+      try {
+        const statsResponse = await IncidentApi.getIncidentSummaryStats();
+        setSummaryStats(statsResponse);
+      } catch (statsError) {
+        console.error('Failed to load incident summary stats:', statsError);
+        setSummaryStats(null);
+      }
+
       if (keepSelectedIncidentId) {
         const nextSelected = response.items.find((item) => item.incident.id === keepSelectedIncidentId) ?? null;
         setSelectedIncidentReport(nextSelected);
@@ -170,7 +210,7 @@ export const IncidentsAndCasesPage: FC = observer(() => {
     } catch (refreshError) {
       console.error('Failed to refresh incidents report:', refreshError);
     }
-  }, [page, rowsPerPage]);
+  }, [appliedDocumentId, appliedIncidentId, page, rowsPerPage, selectedStatus]);
 
   useEffect(() => {
     const loadReports = async () => {
@@ -189,47 +229,36 @@ export const IncidentsAndCasesPage: FC = observer(() => {
     void loadReports();
   }, [refreshReports]);
 
-  const filteredItems = useMemo(() => {
-    const rawItems = data?.items ?? [];
-    const query = search.trim().toLowerCase();
-    if (!query) return rawItems;
-
-    return rawItems.filter((item) => {
-      if (
-        item.incident.id.toLowerCase().includes(query) ||
-        item.incident.status.toLowerCase().includes(query)
-      ) {
-        return true;
-      }
-
-      return item.findings.some((finding) => {
-        if (finding.id.toLowerCase().includes(query) || finding.priority.toLowerCase().includes(query)) {
-          return true;
-        }
-        return finding.cases.some((caseItem) => {
-          return (
-            caseItem.id.toLowerCase().includes(query) ||
-            caseItem.status.toLowerCase().includes(query) ||
-            caseItem.actionPlan?.tasks.some((task) => task.title.toLowerCase().includes(query)) === true
-          );
-        });
-      });
-    });
-  }, [data?.items, search]);
-
   const stats = useMemo(() => {
     const items = data?.items ?? [];
-    const findingsCount = items.reduce((acc, item) => acc + item.findings.length, 0);
-    const casesCount = items.reduce(
-      (acc, item) => acc + item.findings.reduce((findingAcc, finding) => findingAcc + finding.cases.length, 0),
-      0
-    );
     return {
-      incidentsCount: data?.total ?? items.length,
-      findingsCount,
-      casesCount,
+      incidentsCount: summaryStats?.totalIncidents ?? data?.total ?? items.length,
+      findingsCount:
+        summaryStats?.totalFindings ??
+        items.reduce((acc, item) => acc + item.findings.length, 0),
+      casesCount:
+        summaryStats?.totalCases ??
+        items.reduce(
+          (acc, item) => acc + item.findings.reduce((findingAcc, finding) => findingAcc + finding.cases.length, 0),
+          0
+        ),
     };
-  }, [data]);
+  }, [data, summaryStats]);
+
+  const handleFind = () => {
+    setAppliedIncidentId(searchIncidentId.trim());
+    setAppliedDocumentId(searchDocumentId.trim());
+    setPage(0);
+  };
+
+  const handleResetFilters = () => {
+    setSearchIncidentId('');
+    setSearchDocumentId('');
+    setSelectedStatus('');
+    setAppliedIncidentId('');
+    setAppliedDocumentId('');
+    setPage(0);
+  };
 
   const handleAddComment = async (caseId: string, incidentId: string) => {
     const draft = commentDraftByCase[caseId]?.trim();
@@ -311,7 +340,7 @@ export const IncidentsAndCasesPage: FC = observer(() => {
           Инциденты и случаи
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          Единый реестр инцидентов, findings и связанных случаев с постраничной загрузкой.
+          Единый реестр инцидентов, обнаружений и связанных случаев с постраничной загрузкой.
         </Typography>
 
         <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -329,7 +358,7 @@ export const IncidentsAndCasesPage: FC = observer(() => {
             <Card>
               <CardContent>
                 <Typography color="text.secondary" variant="body2">
-                  Всего findings
+                  Всего обнаружений
                 </Typography>
                 <Typography variant="h5">{stats.findingsCount}</Typography>
               </CardContent>
@@ -348,17 +377,52 @@ export const IncidentsAndCasesPage: FC = observer(() => {
         </Grid>
 
         <Paper sx={{ p: 2, mb: 2 }}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Поиск по ID инцидента, finding, случая или статусу..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            InputProps={{
-              startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />,
-            }}
-          />
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
+            <TextField
+              fullWidth
+              size="small"
+              label="ID инцидента"
+              placeholder="Например: INC-2026-001"
+              value={searchIncidentId}
+              onChange={(event) => setSearchIncidentId(event.target.value)}
+            />
+            <TextField
+              fullWidth
+              size="small"
+              label="ID документа"
+              placeholder="Например: DOC-1001"
+              value={searchDocumentId}
+              onChange={(event) => setSearchDocumentId(event.target.value)}
+            />
+            <Select
+              size="small"
+              displayEmpty
+              value={selectedStatus}
+              onChange={(event) => {
+                setSelectedStatus(event.target.value);
+                setPage(0);
+              }}
+              sx={{ minWidth: 220 }}
+            >
+              <MenuItem value="">Все статусы</MenuItem>
+              {INCIDENT_STATUS_OPTIONS.map((status) => (
+                <MenuItem key={status} value={status}>
+                  {getIncidentStatusLabelRu(status)}
+                </MenuItem>
+              ))}
+            </Select>
+            <Button variant="contained" startIcon={<SearchIcon />} onClick={handleFind}>
+              Найти
+            </Button>
+            <Button variant="outlined" onClick={handleResetFilters}>
+              Сбросить
+            </Button>
+          </Stack>
         </Paper>
+
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Показано: {data?.items.length ?? 0}
+        </Typography>
 
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
@@ -372,13 +436,13 @@ export const IncidentsAndCasesPage: FC = observer(() => {
           </Alert>
         )}
 
-        {!loading && !error && filteredItems.length === 0 && (
+        {!loading && !error && (data?.items.length ?? 0) === 0 && (
           <Alert severity="info">По заданному фильтру нет данных.</Alert>
         )}
 
         {!loading &&
           !error &&
-          filteredItems.map((item) => (
+          (data?.items ?? []).map((item) => (
             <Accordion key={item.incident.id} sx={{ mb: 1.5 }} defaultExpanded>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                 <Stack
@@ -392,9 +456,26 @@ export const IncidentsAndCasesPage: FC = observer(() => {
                 >
                   <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
                     <IncidentIcon color="error" fontSize="small" />
-                    <Typography variant="subtitle1">
-                      Инцидент связан с документом {formatUnknown(item.incident.documentId)}
-                    </Typography>
+                    <Box>
+                      <Typography variant="subtitle1">
+                        Инцидент связан с документом {formatUnknown(item.incident.documentId)}
+                      </Typography>
+                      <Stack direction="row" spacing={0.5} alignItems="center" useFlexGap>
+                        <Typography variant="caption" color="text.secondary">
+                          ID инцидента: {item.incident.id}
+                        </Typography>
+                        <IconButton
+                          size="small"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void copyToClipboard(item.incident.id);
+                          }}
+                          aria-label="Скопировать ID инцидента"
+                        >
+                          <ContentCopyIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      </Stack>
+                    </Box>
                     <Chip
                       label={getIncidentStatusLabelRu(item.incident.status)}
                       color={getStatusChipColor(item.incident.status)}

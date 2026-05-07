@@ -741,6 +741,9 @@ export const incidentsHandlers = [
     });
 
     const stats = {
+      totalIncidents: mockIncidents.length,
+      totalFindings: mockFindings.length,
+      totalCases: mockCases.length,
       new: mockIncidents.filter((i) => i.status === 'NEW').length,
       assigned: mockIncidents.filter((i) => i.status === 'ASSIGNED' || i.status === 'PARTLY_PROGRESS').length,
       inReview: mockIncidents.filter((i) => i.status === 'IN_REVIEW').length,

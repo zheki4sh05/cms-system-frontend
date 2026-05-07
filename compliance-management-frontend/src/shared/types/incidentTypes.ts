@@ -158,6 +158,12 @@ export interface IncidentStatistics {
   avgResolutionTime: number; // В часах
 }
 
+export interface IncidentSummaryStats {
+  totalIncidents: number;
+  totalFindings: number;
+  totalCases: number;
+}
+
 export interface ResolveIncidentRequest {
   status: IncidentStatus;
   resolutionNotes?: string;
