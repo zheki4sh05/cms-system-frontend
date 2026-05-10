@@ -1,6 +1,14 @@
 import { apiClient } from './apiClient';
 import type { AuthResponse, LoginCredentials, RegisterCredentials } from '@shared/types/customTypes';
 
+/** Вложенный блок из GET /api/users/me (если не null — пользователь привязан к отделу) */
+export interface UserMeEmployeeInternal {
+  employeeId: string;
+  departmentId: string;
+  departmentName: string;
+  departmentRole: string;
+}
+
 export interface UserMeResponse {
   id: string;
   name?: string;
@@ -10,6 +18,9 @@ export interface UserMeResponse {
   role: string;
   companyId?: string;
   employeeId?: string;
+  /** Устаревшее плоское поле; приоритет у employeeInternal */
+  departmentId?: string;
+  employeeInternal?: UserMeEmployeeInternal | null;
 }
 
 export class AuthApi {

@@ -15,6 +15,8 @@ export interface User {
   employeeId?: string;
   companyId?: string;
   departmentId?: string;
+  /** Подгружается после логина: GET /departments/{departmentId} */
+  departmentName?: string;
   isFirstLogin?: boolean;
 }
 

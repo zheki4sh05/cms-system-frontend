@@ -347,3 +347,71 @@ export interface IncidentReportsPageResult {
   total: number;
   totalPages: number;
 }
+
+/** Группа по documentId за месяц (GET /api/incidents/problem-areas) */
+export interface IncidentProblemAreaGroup {
+  documentId: string;
+  incidentCount: number;
+  incidents: IncidentReportItem[];
+}
+
+export interface IncidentProblemAreasResponse {
+  /** YYYY-MM, UTC */
+  month: string;
+  groups: IncidentProblemAreaGroup[];
+}
+
+/** GET /api/incidents/overview — область охвата данных */
+export type IncidentsOverviewScope = 'COMPANY' | 'DEPARTMENT';
+
+export type IncidentWorkflowStatusOverview = 'OPEN' | 'PARTLY_PROGRESS' | 'IN_PROGRESS' | 'RESOLVED';
+
+export interface IncidentsOverviewIncidentsBlock {
+  /** Количества по статусам инцидента */
+  byStatus: Partial<Record<IncidentWorkflowStatusOverview, number>>;
+  withDocumentId: number;
+  withoutDocumentId: number;
+  /** Не RESOLVED, минимальная дата находки старше 14 суток */
+  staleUnresolved: number;
+}
+
+export interface IncidentsOverviewFindingsBlock {
+  total: number;
+  /** Finding без назначенного пользователя */
+  withoutAssignedUser: number;
+}
+
+export interface IncidentsOverviewCasesBlock {
+  total: number;
+  waitingVerification: number;
+  closed: number;
+  other: number;
+}
+
+export interface IncidentsOverviewActionPlansBlock {
+  withOverdueTasks: number;
+}
+
+export interface IncidentRiskHotspotItem {
+  riskObjectId: string;
+  incidentCount: number;
+  /** Имя из CMS_MONITORING при наличии */
+  name?: string | null;
+}
+
+export interface IncidentsOverviewSeverityDistribution {
+  low: number;
+  medium: number;
+  high: number;
+  unknown: number;
+}
+
+export interface IncidentsOverviewResponse {
+  scope: IncidentsOverviewScope;
+  incidents: IncidentsOverviewIncidentsBlock;
+  findings: IncidentsOverviewFindingsBlock;
+  cases: IncidentsOverviewCasesBlock;
+  actionPlans: IncidentsOverviewActionPlansBlock;
+  riskHotspots: IncidentRiskHotspotItem[];
+  incidentsByRiskObjectSeverity: IncidentsOverviewSeverityDistribution;
+}

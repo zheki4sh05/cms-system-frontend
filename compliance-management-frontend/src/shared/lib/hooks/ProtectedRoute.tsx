@@ -43,7 +43,9 @@ export const ProtectedRoute: FC<ProtectedRouteProps> = observer(
 function getRolePath(role: string, source: string): string {
   switch (role) {
     case UserRoleValues.MANAGER:
-      return '/manager/'+source;
+      // Панель менеджера (/manager/dashboard) временно скрыта — стартовая страница
+      if (source === 'dashboard') return '/manager/incidents';
+      return '/manager/' + source;
     case UserRoleValues.SUPERVISOR:
       return '/supervisor/'+source;
     case UserRoleValues.EXECUTIVE:

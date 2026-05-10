@@ -1,6 +1,7 @@
 import { apiClient } from './apiClient';
 import type { 
   Department,
+  DepartmentDetails,
   CreateDepartmentRequest,
   UpdateDepartmentRequest,
   TransferEmployeeRequest,
@@ -9,6 +10,10 @@ import type {
 type DepartmentApiResponse = Department & {
   supervisorId?: string;
   supervisorName?: string;
+};
+
+type DepartmentDetailsApiResponse = DepartmentApiResponse & {
+  employees?: DepartmentDetails['employees'];
 };
 
 export class DepartmentApi {
@@ -49,9 +54,13 @@ export class DepartmentApi {
   }
 
   // Получение департамента по ID
-  static async getDepartment(id: string): Promise<Department> {
-    const response = await apiClient.get<DepartmentApiResponse>(`/departments/${id}`);
-    return this.normalizeDepartment(response.data);
+  static async getDepartment(id: string): Promise<DepartmentDetails> {
+    const response = await apiClient.get<DepartmentDetailsApiResponse>(`/departments/${id}`);
+    const normalizedDepartment = this.normalizeDepartment(response.data);
+    return {
+      ...normalizedDepartment,
+      employees: response.data.employees ?? [],
+    };
   }
 
   // Создание департамента (только Executive)

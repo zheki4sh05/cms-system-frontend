@@ -1,6 +1,6 @@
-import { RouterProvider } from "./providers/RouterProviders";
-import { StoreProvider } from "./providers/StoreProvider";
-import { ThemeProvider } from "./providers/ThemeProviders";
+import { RouterProvider } from '@app/providers/RouterProviders';
+import { StoreProvider } from '@app/providers/StoreProvider';
+import { ThemeProvider } from '@app/providers/ThemeProviders';
 
 export const App = () => {
   return (

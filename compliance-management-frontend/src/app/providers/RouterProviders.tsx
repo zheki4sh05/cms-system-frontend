@@ -8,7 +8,6 @@ import { observer } from 'mobx-react-lite';
 import { LoginPage } from '@pages/auth/LoginPage/LoginPage';
 
 // Manager pages
-import { ManagerDashboardPage } from '@pages/manager/DashboardPage/DashBoardPage';
 import { ManagerIncidentsPage } from '@pages/manager/IncidentsPage/ManagerIncidentPage';
 import { ManagerCasesPage } from '@pages/manager/CasesPage/ManagerCasesPage';
 import { ManagerTasksPage } from '@pages/manager/TasksPage/ManagerTasksPage';
@@ -51,7 +50,12 @@ export const RouterProvider: FC = observer(() => {
             <ProtectedRoute allowedRoles={[UserRoleValues.MANAGER]}>
               <AppLayout>
                 <Routes>
-                  <Route path="dashboard" element={<ManagerDashboardPage />} />
+                  <Route index element={<Navigate to="incidents" replace />} />
+                  {/* Панель менеджера по закупкам — вернуть элемент ManagerDashboardPage, когда будет готово */}
+                  <Route
+                    path="dashboard"
+                    element={<Navigate to="/manager/incidents" replace />}
+                  />
                   <Route path="incidents" element={<ManagerIncidentsPage />} />
                  <Route path="cases" element={<ManagerCasesPage />} />
                 <Route path="tasks" element={<ManagerTasksPage />} />

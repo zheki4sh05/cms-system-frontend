@@ -22,66 +22,47 @@ export interface SupervisorDashboardStats {
   escalationRate: number; // Процент инцидентов, переведенных в случаи
 }
 
+/** Элемент списка GET /api/incidents/kpi/managers (поле items) */
 export interface TeamKPI {
   managerId: string;
   managerName: string;
-  avatar?: string;
-  
-  // Метрики производительности
+
   assignedIncidents: number;
   resolvedIncidents: number;
   activeCases: number;
   completedCases: number;
-  
-  // Качество работы
-  avgResolutionTime: number; // В часах
-  falsePositiveRate: number;
-  onTimeCompletion: number; // Процент выполненных в срок
-  
-  // Рейтинг
-  performanceScore: number; // 0-100
-  rank: number;
+
+  /** Среднее время решения инцидента, ч (от earliest finding до resolvedDate) */
+  avgResolutionTime: number;
+  /** Доля задач плана (DONE) с completedAt <= dueDate, %; при отсутствии DONE — 0 */
+  onTimeCompletion: number;
 }
 
-export interface VerificationQueue {
-  id: string;
-  type: 'ACTION_PLAN' | 'CASE_CLOSURE';
-  title: string;
-  submittedBy: string;
-  submittedByName: string;
-  submittedAt: string;
-  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
-  
-  // Детали
-  caseId?: string;
-  actionPlanId?: string;
-  estimatedReviewTime: number; // В минутах
-  
-  // Контекст
-  severity?: string;
-  incidentCount?: number;
-  taskCount?: number;
-  completedTasks?: number;
+export interface ManagersKpiResponse {
+  items: TeamKPI[];
 }
 
-export interface ProblemArea {
-  id: string;
-  category: string;
-  title: string;
-  description: string;
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-  
-  // Метрики проблемы
-  affectedIncidents: number;
-  affectedCases: number;
-  estimatedImpact: string; // Описание влияния
-  
-  // Тренд
-  trend: 'IMPROVING' | 'STABLE' | 'WORSENING';
-  trendPercentage: number;
-  
-  // Рекомендации
-  recommendations: string[];
+/** Ответственный по делу (case.assignedUserId → профиль) */
+export interface VerificationResponsible {
+  userId: string | null;
+  employeeId: string | null;
+  firstName: string | null;
+  lastName: string | null;
+}
+
+/** Элемент GET /api/supervisor/verification/pending (поле items) */
+export interface PendingVerificationItem {
+  actionPlanId: string;
+  incidentId: string;
+  /** Название документа из finding details или null */
+  documentTitle: string | null;
+  responsible: VerificationResponsible;
+  /** Самая ранняя дата обнаружения по findings, ISO */
+  incidentReceivedAt: string | null;
+}
+
+export interface PendingVerificationResponse {
+  items: PendingVerificationItem[];
 }
 
 export interface RuleEffectiveness {

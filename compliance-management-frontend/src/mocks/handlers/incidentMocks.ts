@@ -15,11 +15,98 @@ import {
   type EscalateIncidentRequest,
   type IncidentAssignment,
   type IncidentViewDto,
+  type IncidentsOverviewResponse,
 } from '@shared/types/incidentTypes';
 import type { Case, CaseStatus } from '@shared/types/caseTypes';
+import type { TeamKPI } from '@shared/types/supervisorTypes';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 const API_ROOT = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
+
+// GET /api/incidents/kpi/managers — KPI менеджеров для супервизора
+const mockManagersKpiItems: TeamKPI[] = [
+  {
+    managerId: '3',
+    managerName: 'Иван Иванов',
+    assignedIncidents: 45,
+    resolvedIncidents: 42,
+    activeCases: 8,
+    completedCases: 7,
+    avgResolutionTime: 28,
+    onTimeCompletion: 94,
+  },
+  {
+    managerId: '4',
+    managerName: 'Петр Петров',
+    assignedIncidents: 38,
+    resolvedIncidents: 34,
+    activeCases: 6,
+    completedCases: 5,
+    avgResolutionTime: 32,
+    onTimeCompletion: 89,
+  },
+  {
+    managerId: '5',
+    managerName: 'Мария Сидорова',
+    assignedIncidents: 42,
+    resolvedIncidents: 37,
+    activeCases: 7,
+    completedCases: 6,
+    avgResolutionTime: 35,
+    onTimeCompletion: 86,
+  },
+  {
+    managerId: '6',
+    managerName: 'Алексей Смирнов',
+    assignedIncidents: 31,
+    resolvedIncidents: 26,
+    activeCases: 5,
+    completedCases: 3,
+    avgResolutionTime: 41,
+    onTimeCompletion: 78,
+  },
+];
+
+const mockIncidentsOverview: IncidentsOverviewResponse = {
+  scope: 'DEPARTMENT',
+  incidents: {
+    byStatus: {
+      OPEN: 4,
+      PARTLY_PROGRESS: 6,
+      IN_PROGRESS: 3,
+      RESOLVED: 18,
+    },
+    withDocumentId: 22,
+    withoutDocumentId: 9,
+    staleUnresolved: 2,
+  },
+  findings: {
+    total: 31,
+    withoutAssignedUser: 5,
+  },
+  cases: {
+    total: 14,
+    waitingVerification: 4,
+    closed: 5,
+    other: 5,
+  },
+  actionPlans: {
+    withOverdueTasks: 3,
+  },
+  riskHotspots: [
+    { riskObjectId: 'RO-Z-01', incidentCount: 9, name: 'Закупки комплектующих' },
+    { riskObjectId: 'RO-D-42', incidentCount: 7, name: 'Контрагент Alfa' },
+    { riskObjectId: 'RO-S-11', incidentCount: 5, name: 'Склад регион Восток' },
+    { riskObjectId: 'RO-F-03', incidentCount: 4, name: null },
+    { riskObjectId: 'RO-Q-07', incidentCount: 2, name: 'Тендеры Q1' },
+  ],
+  incidentsByRiskObjectSeverity: {
+    low: 10,
+    medium: 12,
+    high: 8,
+    unknown: 1,
+  },
+};
 
 // Моковые данные инцидентов
 let mockIncidents: Incident[] = [
@@ -759,6 +846,20 @@ export const incidentsHandlers = [
     };
 
     return HttpResponse.json(stats);
+  }),
+
+  // GET /api/incidents/kpi/managers — KPI команды (супервизор)
+  http.get(`${API_ROOT}/api/incidents/kpi/managers`, async () => {
+    await delay(500);
+    console.log('👥 [MSW] Fetching managers KPI');
+    return HttpResponse.json({ items: mockManagersKpiItems });
+  }),
+
+  // GET /api/incidents/overview
+  http.get(`${API_ROOT}/api/incidents/overview`, async () => {
+    await delay(400);
+    console.log('📊 [MSW] Fetching incidents overview');
+    return HttpResponse.json(mockIncidentsOverview);
   }),
 
   // GET /api/incidents/:incidentId/view — детальный просмотр (IncidentApi.getIncidentView)

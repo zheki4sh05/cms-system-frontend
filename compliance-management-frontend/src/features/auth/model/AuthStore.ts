@@ -1,5 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx';
-import { AuthApi } from '@shared/lib/api/authApi';
+import { AuthApi, type UserMeResponse } from '@shared/lib/api/authApi';
+import { DepartmentApi } from '@shared/lib/api/departmentApi';
 import { type User, type LoginCredentials, type RegisterCredentials } from '@shared/types/customTypes';
 import { UserRoleValues } from '@shared/types/customTypes';
 export class AuthStore {
@@ -36,13 +37,71 @@ export class AuthStore {
     }
   }
 
+  /** Слияние полей из GET /api/users/me (в т.ч. employeeInternal) */
+  private mergeUserWithMeProfile(user: User, profile: UserMeResponse): User {
+    const internal = profile.employeeInternal;
+    const hasInternal = internal != null && typeof internal === 'object';
+
+    const departmentId = hasInternal
+      ? internal.departmentId || user.departmentId
+      : profile.departmentId ?? user.departmentId;
+
+    const departmentName = hasInternal
+      ? internal.departmentName || user.departmentName
+      : user.departmentName;
+
+    const employeeId = hasInternal
+      ? profile.employeeId ?? internal.employeeId ?? user.employeeId
+      : profile.employeeId ?? user.employeeId;
+
+    return {
+      ...user,
+      firstName: profile.firstName || user.firstName,
+      lastName: profile.lastName || user.lastName,
+      email: profile.email || user.email,
+      role: profile.role as User['role'],
+      companyId: profile.companyId || user.companyId,
+      employeeId,
+      departmentId,
+      departmentName,
+    };
+  }
+
+  /** Дополняет name отдела через GET /departments/{id}, если имя ещё не известно */
+  private async enrichUserWithDepartment(user: User): Promise<User> {
+    if (!user.departmentId) {
+      return user;
+    }
+    if (user.departmentName) {
+      return user;
+    }
+    try {
+      const department = await DepartmentApi.getDepartment(user.departmentId);
+      return {
+        ...user,
+        departmentId: department.id,
+        departmentName: department.name,
+      };
+    } catch (error) {
+      console.error('Failed to load department:', error);
+      return user;
+    }
+  }
+
   // Проверка валидности токена
   private async validateToken() {
     try {
-      const user = await AuthApi.getCurrentUser();
+      let user = await AuthApi.getCurrentUser();
+      try {
+        const profile = await AuthApi.getUserMe();
+        user = this.mergeUserWithMeProfile(user, profile);
+      } catch (profileError) {
+        console.error('Failed to load /api/users/me during token validation:', profileError);
+      }
+      const enriched = await this.enrichUserWithDepartment(user);
       runInAction(() => {
-        this.user = user;
-        localStorage.setItem('user', JSON.stringify(user));
+        this.user = enriched;
+        localStorage.setItem('user', JSON.stringify(enriched));
       });
     } catch (error) {
       console.error('Token validation failed:', error);
@@ -66,18 +125,12 @@ export class AuthStore {
 
       try {
         const profile = await AuthApi.getUserMe();
-        userData = {
-          ...userData,
-          firstName: profile.firstName || userData.firstName,
-          lastName: profile.lastName || userData.lastName,
-          email: profile.email || userData.email,
-          role: profile.role as User['role'],
-          companyId: profile.companyId || userData.companyId,
-          employeeId: profile.employeeId || userData.employeeId,
-        };
+        userData = this.mergeUserWithMeProfile(userData, profile);
       } catch (profileError) {
         console.error('Failed to load /api/users/me profile:', profileError);
       }
+
+      userData = await this.enrichUserWithDepartment(userData);
 
       runInAction(() => {
         this.user = userData;
@@ -108,8 +161,10 @@ export class AuthStore {
     try {
       const response = await AuthApi.register(credentials);
 
+      const userWithDepartment = await this.enrichUserWithDepartment(response.user);
+
       runInAction(() => {
-        this.user = response.user;
+        this.user = userWithDepartment;
         this.isAuthenticated = true;
         this.isLoading = false;
 
@@ -119,10 +174,10 @@ export class AuthStore {
         // Сохранение токенов и данных пользователя
         localStorage.setItem('accessToken', response.tokens.accessToken);
         localStorage.setItem('refreshToken', response.tokens.refreshToken);
-        localStorage.setItem('user', JSON.stringify(response.user));
+        localStorage.setItem('user', JSON.stringify(userWithDepartment));
       });
 
-      return response.user;
+      return userWithDepartment;
     } catch (error: any) {
       runInAction(() => {
         this.error = error.response?.data?.message || 'Ошибка регистрации';

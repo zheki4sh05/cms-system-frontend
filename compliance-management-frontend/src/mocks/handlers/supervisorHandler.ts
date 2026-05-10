@@ -1,11 +1,10 @@
 // src/mocks/handlers_supervisor.ts
 
 import { http, HttpResponse, delay } from 'msw';
+import type { IncidentProblemAreasResponse } from '@shared/types/incidentTypes';
 import type {
   SupervisorDashboardStats,
-  TeamKPI,
-  VerificationQueue,
-  ProblemArea,
+  PendingVerificationItem,
   RuleEffectiveness,
   FinancialImpact,
   TrendData,
@@ -14,6 +13,7 @@ import type {
 } from '@shared/types/supervisorTypes';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+const API_ROOT = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
 
 // Моковые данные статистики
 const mockDashboardStats: SupervisorDashboardStats = {
@@ -34,231 +34,201 @@ const mockDashboardStats: SupervisorDashboardStats = {
   escalationRate: 14.7,
 };
 
-// Моковые KPI команды
-const mockTeamKPI: TeamKPI[] = [
+// GET /api/supervisor/verification/pending
+let mockPendingVerifications: PendingVerificationItem[] = [
   {
-    managerId: '3',
-    managerName: 'Иван Иванов',
-    avatar: undefined,
-    assignedIncidents: 45,
-    resolvedIncidents: 42,
-    activeCases: 8,
-    completedCases: 7,
-    avgResolutionTime: 28,
-    falsePositiveRate: 5.2,
-    onTimeCompletion: 94,
-    performanceScore: 95,
-    rank: 1,
-  },
-  {
-    managerId: '4',
-    managerName: 'Петр Петров',
-    avatar: undefined,
-    assignedIncidents: 38,
-    resolvedIncidents: 34,
-    activeCases: 6,
-    completedCases: 5,
-    avgResolutionTime: 32,
-    falsePositiveRate: 7.1,
-    onTimeCompletion: 89,
-    performanceScore: 88,
-    rank: 2,
-  },
-  {
-    managerId: '5',
-    managerName: 'Мария Сидорова',
-    avatar: undefined,
-    assignedIncidents: 42,
-    resolvedIncidents: 37,
-    activeCases: 7,
-    completedCases: 6,
-    avgResolutionTime: 35,
-    falsePositiveRate: 9.5,
-    onTimeCompletion: 86,
-    performanceScore: 85,
-    rank: 3,
-  },
-  {
-    managerId: '6',
-    managerName: 'Алексей Смирнов',
-    avatar: undefined,
-    assignedIncidents: 31,
-    resolvedIncidents: 26,
-    activeCases: 5,
-    completedCases: 3,
-    avgResolutionTime: 41,
-    falsePositiveRate: 12.3,
-    onTimeCompletion: 78,
-    performanceScore: 72,
-    rank: 4,
-  },
-];
-
-// Моковая очередь верификации
-let mockVerificationQueue: VerificationQueue[] = [
-  {
-    id: 'VER-001',
-    type: 'ACTION_PLAN',
-    title: 'План корректирующих действий: Превышение бюджета закупки',
-    submittedBy: '3',
-    submittedByName: 'Иван Иванов',
-    submittedAt: '2024-12-02T16:30:00Z',
-    priority: 'URGENT',
-    caseId: 'CS-2024-001',
     actionPlanId: 'AP-2024-003',
-    estimatedReviewTime: 15,
-    severity: 'HIGH',
-    taskCount: 5,
-    completedTasks: 5,
+    incidentId: 'INC-2024-156',
+    documentTitle: 'Договор поставки №123 / Превышение бюджета закупки',
+    responsible: {
+      userId: '3',
+      employeeId: 'emp-3',
+      firstName: 'Иван',
+      lastName: 'Иванов',
+    },
+    incidentReceivedAt: '2024-12-01T11:00:00Z',
   },
   {
-    id: 'VER-002',
-    type: 'CASE_CLOSURE',
-    title: 'Закрытие случая: Дублирование записей поставщика',
-    submittedBy: '4',
-    submittedByName: 'Петр Петров',
-    submittedAt: '2024-12-02T14:00:00Z',
-    priority: 'NORMAL',
-    caseId: 'CS-2024-002',
-    estimatedReviewTime: 10,
-    severity: 'MEDIUM',
-    incidentCount: 1,
+    actionPlanId: 'AP-2024-007',
+    incidentId: 'INC-2024-160',
+    documentTitle: null,
+    responsible: {
+      userId: '4',
+      employeeId: null,
+      firstName: 'Пётр',
+      lastName: 'Петров',
+    },
+    incidentReceivedAt: '2024-12-02T14:00:00Z',
   },
   {
-    id: 'VER-003',
-    type: 'ACTION_PLAN',
-    title: 'План корректирующих действий: Систематические задержки поставок',
-    submittedBy: '5',
-    submittedByName: 'Мария Сидорова',
-    submittedAt: '2024-12-02T11:20:00Z',
-    priority: 'HIGH',
-    caseId: 'CS-2024-004',
     actionPlanId: 'AP-2024-001',
-    estimatedReviewTime: 20,
-    severity: 'MEDIUM',
-    taskCount: 3,
-    completedTasks: 1,
+    incidentId: 'INC-2024-158',
+    documentTitle: 'Спецификация к тендеру',
+    responsible: {
+      userId: '5',
+      employeeId: 'emp-5',
+      firstName: 'Мария',
+      lastName: 'Сидорова',
+    },
+    incidentReceivedAt: '2024-12-02T11:20:00Z',
   },
   {
-    id: 'VER-004',
-    type: 'ACTION_PLAN',
-    title: 'План корректирующих действий: Конфликт интересов',
-    submittedBy: '3',
-    submittedByName: 'Иван Иванов',
-    submittedAt: '2024-12-01T18:45:00Z',
-    priority: 'URGENT',
-    caseId: 'CS-2024-003',
     actionPlanId: 'AP-2024-004',
-    estimatedReviewTime: 25,
-    severity: 'CRITICAL',
-    taskCount: 7,
-    completedTasks: 7,
-  },
-  {
-    id: 'VER-005',
-    type: 'CASE_CLOSURE',
-    title: 'Закрытие случая: Изменение цен после согласования',
-    submittedBy: '6',
-    submittedByName: 'Алексей Смирнов',
-    submittedAt: '2024-12-01T15:10:00Z',
-    priority: 'NORMAL',
-    caseId: 'CS-2024-006',
-    estimatedReviewTime: 8,
-    severity: 'HIGH',
-    incidentCount: 2,
+    incidentId: 'INC-2024-157',
+    documentTitle: 'Акт сверки с контрагентом',
+    responsible: {
+      userId: '3',
+      employeeId: 'emp-3',
+      firstName: 'Иван',
+      lastName: 'Иванов',
+    },
+    incidentReceivedAt: '2024-12-01T18:45:00Z',
   },
 ];
 
-// Моковые проблемные зоны
-const mockProblemAreas: ProblemArea[] = [
-  {
-    id: 'PROB-001',
-    category: 'Финансовый контроль',
-    title: 'Рост случаев превышения бюджета на 23%',
-    description: 'За последний месяц количество случаев превышения утвержденного бюджета выросло на 23%. Основная причина - изменение цен поставщиками после согласования.',
-    severity: 'CRITICAL',
-    affectedIncidents: 12,
-    affectedCases: 4,
-    estimatedImpact: 'Финансовые потери ~2.5 млн руб/месяц, репутационные риски',
-    trend: 'WORSENING',
-    trendPercentage: 23,
-    recommendations: [
-      'Внедрить механизм фиксации цен в договорах',
-      'Автоматизировать контроль изменения цен',
-      'Провести обучение менеджеров по закупкам',
-      'Пересмотреть процесс согласования бюджета',
-    ],
-  },
-  {
-    id: 'PROB-002',
-    category: 'Качество данных',
-    title: 'Систематические дубликаты контрагентов',
-    description: 'Обнаружено 15 случаев дублирования записей контрагентов за месяц. Проблема связана с ручным вводом данных разными сотрудниками.',
-    severity: 'MEDIUM',
-    affectedIncidents: 15,
-    affectedCases: 2,
-    estimatedImpact: 'Ошибки в отчетности, затраты времени на исправление, риск неправильных платежей',
-    trend: 'STABLE',
-    trendPercentage: 0,
-    recommendations: [
-      'Внедрить автоматическую проверку на дубликаты при создании',
-      'Использовать API ЕГРЮЛ для автозаполнения данных',
-      'Централизовать управление справочником контрагентов',
-    ],
-  },
-  {
-    id: 'PROB-003',
-    category: 'Комплаенс',
-    title: 'Недостаточный контроль лицензий поставщиков',
-    description: 'Выявлено 8 случаев работы с поставщиками с истекшими или отсутствующими лицензиями. Риск штрафов от регуляторов.',
-    severity: 'HIGH',
-    affectedIncidents: 8,
-    affectedCases: 3,
-    estimatedImpact: 'Юридические риски, штрафы до 500 тыс руб, приостановка операций',
-    trend: 'IMPROVING',
-    trendPercentage: -15,
-    recommendations: [
-      'Автоматизировать мониторинг сроков действия лицензий',
-      'Внедрить уведомления за 30 дней до истечения',
-      'Создать реестр обязательных лицензий по категориям',
-    ],
-  },
-  {
-    id: 'PROB-004',
-    category: 'Логистика',
-    title: 'Высокий процент задержек поставок (18%)',
-    description: 'У 18% поставщиков наблюдаются систематические задержки поставок. Средняя задержка составляет 4.2 дня.',
-    severity: 'MEDIUM',
-    affectedIncidents: 23,
-    affectedCases: 5,
-    estimatedImpact: 'Срыв производственных планов, издержки на срочные закупки',
-    trend: 'WORSENING',
-    trendPercentage: 12,
-    recommendations: [
-      'Провести аудит надежности поставщиков',
-      'Создать резервный список поставщиков',
-      'Внедрить штрафные санкции в договоры',
-      'Оптимизировать страховой запас',
-    ],
-  },
-  {
-    id: 'PROB-005',
-    category: 'Процессы',
-    title: 'Высокий процент ложных срабатываний правил (12%)',
-    description: 'Некоторые правила генерируют слишком много ложных срабатываний, что снижает эффективность команды.',
-    severity: 'LOW',
-    affectedIncidents: 19,
-    affectedCases: 0,
-    estimatedImpact: 'Потеря времени команды ~120 часов/месяц, снижение доверия к системе',
-    trend: 'IMPROVING',
-    trendPercentage: -8,
-    recommendations: [
-      'Провести ревизию правил с точностью ниже 85%',
-      'Настроить пороговые значения правил',
-      'Внедрить механизм обучения правил на исторических данных',
-    ],
-  },
-];
+// GET /api/incidents/problem-areas
+const mockProblemAreasResponseBase: IncidentProblemAreasResponse = {
+  month: '2026-05',
+  groups: [
+    {
+      documentId: 'DOC-123',
+      incidentCount: 3,
+      incidents: [
+        {
+          incident: {
+            id: 'INC-PA-101',
+            companyId: 'company-1',
+            integrationId: 1,
+            riskObjectId: 'RO-Z-01',
+            riskObjectName: 'Закупка комплектующих №4421',
+            documentId: 'DOC-123',
+            integrationName: 'ERP Закупки',
+            status: 'PARTLY_PROGRESS',
+          },
+          findings: [
+            {
+              id: 'F-PA-1',
+              priority: 'HIGH',
+              assignedUserId: undefined,
+              ruleName: 'Превышение лимита без согласования',
+              details: {},
+              cases: [
+                {
+                  id: 'CS-PA-001',
+                  incidentId: 'INC-PA-101',
+                  findingId: 'F-PA-1',
+                  assignedUserId: undefined,
+                  status: 'WAITING_VERIFICATION',
+                  comments: [],
+                  attachments: [],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          incident: {
+            id: 'INC-PA-102',
+            companyId: 'company-1',
+            integrationId: 1,
+            riskObjectId: 'RO-Z-01',
+            riskObjectName: 'Закупка комплектующих №4421',
+            documentId: 'DOC-123',
+            integrationName: 'ERP Закупки',
+            status: 'IN_REVIEW',
+          },
+          findings: [
+            {
+              id: 'F-PA-2',
+              priority: 'MEDIUM',
+              ruleName: 'Изменение цен после согласования',
+              details: {},
+              cases: [
+                {
+                  id: 'CS-PA-002',
+                  incidentId: 'INC-PA-102',
+                  findingId: 'F-PA-2',
+                  status: 'IN_PROGRESS',
+                  comments: [],
+                  attachments: [],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          incident: {
+            id: 'INC-PA-103',
+            companyId: 'company-1',
+            integrationId: 1,
+            riskObjectId: 'RO-Z-02',
+            riskObjectName: 'Спецификация к тендеру',
+            documentId: 'DOC-123',
+            integrationName: 'ERP Закупки',
+            status: 'RESOLVED',
+          },
+          findings: [
+            {
+              id: 'F-PA-3',
+              priority: 'LOW',
+              ruleName: 'Превышение лимита без согласования',
+              details: {},
+              cases: [],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      documentId: 'DOC-774',
+      incidentCount: 2,
+      incidents: [
+        {
+          incident: {
+            id: 'INC-PA-201',
+            companyId: 'company-1',
+            integrationId: 2,
+            riskObjectId: 'RO-S-09',
+            riskObjectName: 'Договор поставки Alfa',
+            documentId: 'DOC-774',
+            integrationName: 'DMS',
+            status: 'ASSIGNED',
+          },
+          findings: [
+            {
+              id: 'F-PA-201',
+              priority: 'HIGH',
+              ruleName: 'Конфликт интересов при закупках',
+              details: {},
+              cases: [],
+            },
+          ],
+        },
+        {
+          incident: {
+            id: 'INC-PA-202',
+            companyId: 'company-1',
+            integrationId: 2,
+            riskObjectId: 'RO-S-09',
+            riskObjectName: 'Договор поставки Alfa',
+            documentId: 'DOC-774',
+            integrationName: 'DMS',
+            status: 'NEW',
+          },
+          findings: [
+            {
+              id: 'F-PA-202',
+              priority: 'HIGH',
+              ruleName: 'Конфликт интересов при закупках',
+              details: {},
+              cases: [],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
 
 // Моковая эффективность правил
 const mockRuleEffectiveness: RuleEffectiveness[] = [
@@ -394,38 +364,39 @@ export const supervisorHandlers = [
     return HttpResponse.json(mockDashboardStats);
   }),
 
-  // GET /supervisor/team/kpi - Получить KPI команды
-  http.get(`${API_BASE_URL}/supervisor/team/kpi`, async () => {
-    await delay(500);
-    console.log('👥 [MSW] Fetching team KPI');
-    return HttpResponse.json(mockTeamKPI);
-  }),
-
-  // GET /supervisor/verification/queue - Получить очередь верификации
-  http.get(`${API_BASE_URL}/supervisor/verification/queue`, async () => {
+  // GET /api/supervisor/verification/pending
+  http.get(`${API_ROOT}/api/supervisor/verification/pending`, async () => {
     await delay(400);
-    console.log('✅ [MSW] Fetching verification queue');
-    return HttpResponse.json(mockVerificationQueue);
+    console.log('✅ [MSW] Fetching pending verifications');
+    return HttpResponse.json({ items: mockPendingVerifications });
   }),
 
-  // PUT /supervisor/verification/:itemId/process - Обработать верификацию
-  http.put(`${API_BASE_URL}/supervisor/verification/:itemId/process`, async ({ request, params }) => {
+  // PUT /api/supervisor/verification/:actionPlanId
+  http.put(`${API_ROOT}/api/supervisor/verification/:actionPlanId`, async ({ request, params }) => {
     await delay(600);
-    const { itemId } = params;
+    const actionPlanId = String(params.actionPlanId);
     const body = await request.json() as ApproveVerificationRequest;
-    console.log(`✅ [MSW] Processing verification ${itemId}:`, body);
-    
-    // Удалить элемент из очереди
-    mockVerificationQueue = mockVerificationQueue.filter(item => item.id !== itemId);
-    
+    console.log(`✅ [MSW] Processing verification ${actionPlanId}:`, body);
+
+    mockPendingVerifications = mockPendingVerifications.filter((item) => item.actionPlanId !== actionPlanId);
+
     return HttpResponse.json({ message: body.approved ? 'Утверждено' : 'Отклонено' });
   }),
 
-  // GET /supervisor/analytics/problem-areas - Получить проблемные зоны
-  http.get(`${API_BASE_URL}/supervisor/analytics/problem-areas`, async () => {
-    await delay(500);
-    console.log('⚠️ [MSW] Fetching problem areas');
-    return HttpResponse.json(mockProblemAreas);
+  // GET /api/incidents/problem-areas
+  http.get(`${API_ROOT}/api/incidents/problem-areas`, async ({ request }) => {
+    await delay(450);
+    const url = new URL(request.url);
+    const monthParam = url.searchParams.get('month');
+    const month =
+      monthParam && /^\d{4}-\d{2}$/.test(monthParam)
+        ? monthParam
+        : mockProblemAreasResponseBase.month;
+    console.log(`⚠️ [MSW] Fetching incident problem areas, month=${month}`);
+    return HttpResponse.json({
+      ...mockProblemAreasResponseBase,
+      month,
+    });
   }),
 
   // GET /supervisor/analytics/rule-effectiveness - Получить эффективность правил

@@ -108,7 +108,8 @@ export const ManagerIncidentsPage: FC = observer(() => {
   
   // Фильтры
   const [filterOpen, setFilterOpen] = useState(false);
-  const [filters, setFilters] = useState<IncidentFilter>({});
+  const [draftFilters, setDraftFilters] = useState<IncidentFilter>({});
+  const [appliedFilters, setAppliedFilters] = useState<IncidentFilter>({});
   
   // Выбор инцидентов для объединения
   const [selectedIncidents, setSelectedIncidents] = useState<string[]>([]);
@@ -151,12 +152,12 @@ export const ManagerIncidentsPage: FC = observer(() => {
 
   useEffect(() => {
     loadIncidents();
-  }, [filters]);
+  }, []);
 
   const loadIncidents = async () => {
     try {
       setLoading(true);
-      const incidentsData = await IncidentApi.getMyIncidents(filters);
+      const incidentsData = await IncidentApi.getMyIncidents();
       setIncidents(incidentsData);
 
       try {
@@ -507,7 +508,36 @@ export const ManagerIncidentsPage: FC = observer(() => {
     return labels[severity.toUpperCase()] || severity;
   };
 
-  const filteredIncidents = incidents.filter(i => {
+  const filteredIncidents = incidents.filter((i) => {
+    const hasSeverityFilter = (appliedFilters.severity?.length ?? 0) > 0;
+    if (hasSeverityFilter && !appliedFilters.severity?.includes(i.severity)) {
+      return false;
+    }
+
+    const hasCategoryFilter = (appliedFilters.category?.length ?? 0) > 0;
+    if (hasCategoryFilter && !appliedFilters.category?.includes(i.category)) {
+      return false;
+    }
+
+    if (appliedFilters.dateFrom || appliedFilters.dateTo) {
+      const detectedAt = new Date(i.detectedAt);
+      if (Number.isNaN(detectedAt.getTime())) return false;
+
+      if (appliedFilters.dateFrom) {
+        const fromDate = new Date(`${appliedFilters.dateFrom}T00:00:00`);
+        if (!Number.isNaN(fromDate.getTime()) && detectedAt < fromDate) {
+          return false;
+        }
+      }
+
+      if (appliedFilters.dateTo) {
+        const toDate = new Date(`${appliedFilters.dateTo}T23:59:59`);
+        if (!Number.isNaN(toDate.getTime()) && detectedAt > toDate) {
+          return false;
+        }
+      }
+    }
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -518,6 +548,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
         stringifyCategoryValue(i.categoryId).toLowerCase().includes(query)
       );
     }
+
     return true;
   });
 
@@ -559,13 +590,6 @@ export const ManagerIncidentsPage: FC = observer(() => {
                 Создать случай ({selectedIncidents.length})
               </Button>
             )}
-            <Button
-              variant="outlined"
-              startIcon={<FilterIcon />}
-              onClick={() => setFilterOpen(!filterOpen)}
-            >
-              Фильтры
-            </Button>
           </Box>
         </Box>
 
@@ -726,8 +750,10 @@ export const ManagerIncidentsPage: FC = observer(() => {
                   <InputLabel>Критичность</InputLabel>
                   <Select
                     multiple
-                    value={filters.severity || []}
-                    onChange={(e) => setFilters({ ...filters, severity: e.target.value as IncidentSeverity[] })}
+                    value={draftFilters.severity || []}
+                    onChange={(e) =>
+                      setDraftFilters({ ...draftFilters, severity: e.target.value as IncidentSeverity[] })
+                    }
                     label="Критичность"
                   >
                     <MenuItem value="CRITICAL">Критичный</MenuItem>
@@ -742,8 +768,10 @@ export const ManagerIncidentsPage: FC = observer(() => {
                   <InputLabel>Категория</InputLabel>
                   <Select
                     multiple
-                    value={filters.category || []}
-                    onChange={(e) => setFilters({ ...filters, category: e.target.value as IncidentCategory[] })}
+                    value={draftFilters.category || []}
+                    onChange={(e) =>
+                      setDraftFilters({ ...draftFilters, category: e.target.value as IncidentCategory[] })
+                    }
                     label="Категория"
                   >
                     <MenuItem value="FINANCIAL">Финансы</MenuItem>
@@ -761,8 +789,8 @@ export const ManagerIncidentsPage: FC = observer(() => {
                   size="small"
                   label="Дата от"
                   type="date"
-                  value={filters.dateFrom || ''}
-                  onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
+                  value={draftFilters.dateFrom || ''}
+                  onChange={(e) => setDraftFilters({ ...draftFilters, dateFrom: e.target.value })}
                   InputLabelProps={{ shrink: true }}
                 />
               </Grid>
@@ -772,8 +800,8 @@ export const ManagerIncidentsPage: FC = observer(() => {
                   size="small"
                   label="Дата до"
                   type="date"
-                  value={filters.dateTo || ''}
-                  onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
+                  value={draftFilters.dateTo || ''}
+                  onChange={(e) => setDraftFilters({ ...draftFilters, dateTo: e.target.value })}
                   InputLabelProps={{ shrink: true }}
                 />
               </Grid>
@@ -782,8 +810,8 @@ export const ManagerIncidentsPage: FC = observer(() => {
               <Button
                 size="small"
                 onClick={() => {
-                  setFilters({});
-                  loadIncidents();
+                  setDraftFilters({});
+                  setAppliedFilters({});
                 }}
               >
                 Сбросить
@@ -791,7 +819,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
               <Button
                 size="small"
                 variant="contained"
-                onClick={() => loadIncidents()}
+                onClick={() => setAppliedFilters({ ...draftFilters })}
               >
                 Применить
               </Button>
@@ -818,6 +846,29 @@ export const ManagerIncidentsPage: FC = observer(() => {
 
         {/* Табы */}
         <Paper>
+          <Box
+            sx={{
+              px: 2,
+              pt: 2,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 1,
+              flexWrap: 'wrap',
+            }}
+          >
+            <Typography variant="subtitle2" color="text.secondary">
+              Список инцидентов
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<FilterIcon />}
+              onClick={() => setFilterOpen(!filterOpen)}
+            >
+              Фильтры
+            </Button>
+          </Box>
           <Tabs
             value={tabValue}
             onChange={(_, newValue) => setTabValue(newValue)}

@@ -168,14 +168,18 @@ export const ProfileDrawer: FC<ProfileDrawerProps> = observer(({ open, onClose }
               />
             </ListItem>
 
-            {authStore.user?.departmentId && (
+            {(authStore.user?.departmentName || authStore.user?.departmentId) && (
               <ListItem disablePadding sx={{ mb: 2 }}>
                 <ListItemIcon>
                   <BusinessOutlined color="primary" />
                 </ListItemIcon>
                 <ListItemText
                   primary="Отдел"
-                  secondary={authStore.user.departmentId}
+                  secondary={
+                    authStore.user?.departmentName ??
+                    authStore.user?.departmentId ??
+                    ''
+                  }
                   primaryTypographyProps={{ variant: 'body2', color: 'text.secondary' }}
                   secondaryTypographyProps={{ variant: 'body1', color: 'text.primary' }}
                 />

@@ -17,12 +17,12 @@ export const LoginPage: FC = observer(() => {
   const authStore = useAuthStore();
   const navigate = useNavigate();
 
-  // Если пользователь уже авторизован, редиректим на соответствующий дашборд
+  // Если пользователь уже авторизован, редиректим на стартовую страницу роли
   useEffect(() => {
     if (authStore.isAuthenticated && authStore.userRole) {
       switch (authStore.userRole) {
         case UserRoleValues.MANAGER:
-          navigate('/manager/dashboard', { replace: true });
+          navigate('/manager/incidents', { replace: true });
           break;
         case UserRoleValues.SUPERVISOR:
           navigate('/supervisor/dashboard', { replace: true });

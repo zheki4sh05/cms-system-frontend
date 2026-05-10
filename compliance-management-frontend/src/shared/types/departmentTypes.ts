@@ -11,6 +11,17 @@ export interface Department {
   updatedAt: string;
 }
 
+export interface DepartmentEmployee {
+  employeeId: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+}
+
+export interface DepartmentDetails extends Department {
+  employees: DepartmentEmployee[];
+}
+
 export interface CreateDepartmentRequest {
   name: string;
   description?: string;

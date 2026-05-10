@@ -488,6 +488,11 @@ export class IncidentApi {
     };
   }
 
+  /** Полный элемент отчёта (GET .../incidents/:id/report, problem-areas) */
+  static parseIncidentReportItem(raw: unknown): IncidentReportItem {
+    return this.normalizeReportItem(raw);
+  }
+
   static async getIncidentReports(
     page: number,
     limit: number,

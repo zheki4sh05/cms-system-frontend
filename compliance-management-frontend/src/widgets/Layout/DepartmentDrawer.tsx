@@ -16,6 +16,12 @@ import {
   ListItemIcon,
   Alert,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  ListItem,
+  ListItemText,
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -26,12 +32,13 @@ import {
   MoreVert as MoreVertIcon,
   PersonOutlineOutlined,
   SwapHorizOutlined,
+  VisibilityOutlined,
 } from '@mui/icons-material';
 import { useAuthStore } from '@features/auth/useAuthStore';
 import { CreateDepartmentDialog } from './CreateDepartmentDialog';
 import { EditDepartmentDialog } from './EditDepartmentDialog';
 import { AssignSupervisorDialog } from './AssignSupervisorDialog';
-import { type Department } from '@shared/types/departmentTypes';
+import { type Department, type DepartmentDetails } from '@shared/types/departmentTypes';
 import { useState, useEffect, useCallback, type FC } from 'react';
 import { DepartmentApi } from '@shared/lib/api/departmentApi';
 import { CompanyApi } from '@shared/lib/api/companyApi';
@@ -54,9 +61,16 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
   const [menuDepartment, setMenuDepartment] = useState<Department | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [employeesDialogOpen, setEmployeesDialogOpen] = useState(false);
+  const [selectedDepartmentDetails, setSelectedDepartmentDetails] = useState<DepartmentDetails | null>(null);
+  const [employeesLoadError, setEmployeesLoadError] = useState<string | null>(null);
+  const [employeesLoadingDepartmentId, setEmployeesLoadingDepartmentId] = useState<string | null>(null);
 
   // Только топ-менеджмент может создавать и редактировать
   const canManageDepartments = authStore.isExecutive;
+  const currentUserIds = [authStore.user?.id, authStore.user?.employeeId].filter(
+    (id): id is string => Boolean(id)
+  );
 
   const loadDepartments = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -159,6 +173,23 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
     await loadDepartments({ silent: true });
   };
 
+  const handleShowEmployees = async (department: Department) => {
+    setEmployeesDialogOpen(true);
+    setSelectedDepartmentDetails(null);
+    setEmployeesLoadError(null);
+    setEmployeesLoadingDepartmentId(department.id);
+
+    try {
+      const details = await DepartmentApi.getDepartment(department.id);
+      setSelectedDepartmentDetails(details);
+    } catch (error) {
+      console.error('Failed to load department employees:', error);
+      setEmployeesLoadError('Не удалось загрузить список сотрудников департамента');
+    } finally {
+      setEmployeesLoadingDepartmentId(null);
+    }
+  };
+
   return (
     <>
       <Drawer
@@ -256,7 +287,12 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
             </Box>
           ) : (
             <List sx={{ bgcolor: 'background.paper' }}>
-              {filteredDepartments.map((dept) => (
+              {filteredDepartments.map((dept) => {
+                const isCurrentUserManager =
+                  Boolean(dept.managerId) && currentUserIds.includes(dept.managerId);
+                const managerLabel = isCurrentUserManager ? 'Вы' : (dept.managerName || 'Не назначен');
+
+                return (
                 <Paper
                   key={dept.id}
                   variant="outlined"
@@ -306,10 +342,22 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <PersonOutlineOutlined fontSize="small" color="action" />
                         <Typography variant="body2" color="text.secondary">
-                          Руководитель: {dept.managerName || 'Не назначен'}
+                          Руководитель: {managerLabel}
                         </Typography>
                       </Box>
                     </Stack>
+
+                    <Box sx={{ mt: 2 }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<VisibilityOutlined />}
+                        onClick={() => void handleShowEmployees(dept)}
+                        disabled={employeesLoadingDepartmentId === dept.id}
+                      >
+                        Показать сотрудников
+                      </Button>
+                    </Box>
 
                     {/* Dates */}
                     <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
@@ -320,7 +368,8 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
                     </Box>
                   </Box>
                 </Paper>
-              ))}
+                );
+              })}
             </List>
           )}
 
@@ -388,6 +437,51 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
         companyId={companyId}
         onAssign={handleAssignSupervisor}
       />
+
+      <Dialog
+        open={employeesDialogOpen}
+        onClose={() => setEmployeesDialogOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          Сотрудники департамента
+          {selectedDepartmentDetails ? `: ${selectedDepartmentDetails.name}` : ''}
+        </DialogTitle>
+        <DialogContent dividers>
+          {employeesLoadingDepartmentId && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+              <CircularProgress size={28} />
+            </Box>
+          )}
+
+          {!employeesLoadingDepartmentId && employeesLoadError && (
+            <Alert severity="error">{employeesLoadError}</Alert>
+          )}
+
+          {!employeesLoadingDepartmentId && !employeesLoadError && selectedDepartmentDetails && (
+            selectedDepartmentDetails.employees.length > 0 ? (
+              <List>
+                {selectedDepartmentDetails.employees.map((employee) => (
+                  <ListItem key={employee.employeeId} divider>
+                    <ListItemText
+                      primary={`${employee.firstName} ${employee.lastName}`}
+                      secondary={`Employee ID: ${employee.employeeId}`}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                В этом департаменте пока нет сотрудников.
+              </Typography>
+            )
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEmployeesDialogOpen(false)}>Закрыть</Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 });
