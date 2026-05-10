@@ -1,8 +1,24 @@
-import { CasePriority, CaseSeverity, CaseStatus, type Case, type CaseAttachment, type CaseComment, type CaseVerificationDetails, type CreateCaseRequest, type UpdateCaseRequest, type UpdateInvestigationRequest, type VerificationDecision } from "@shared/types/caseTypes";
+import { http, HttpResponse, delay } from 'msw';
+import {
+  CasePriority,
+  CaseSeverity,
+  CaseStatus,
+  type Case,
+  type CaseAttachment,
+  type CaseComment,
+  type CaseVerificationDetails,
+  type CaseViewItem,
+  type CreateCaseRequest,
+  type UpdateCaseRequest,
+  type UpdateInvestigationRequest,
+  type VerificationDecision,
+} from '@shared/types/caseTypes';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
 /** База для маршрутов вида /api/cases/... (без суффикса /api/v1), как в apiClient при url.startsWith('/api/'). */
 const CASES_LEGACY_API_BASE = `${API_BASE_URL.replace(/\/api\/v1\/?$/, '')}/api`;
-import { http, HttpResponse, delay } from 'msw';
+/** Второй сервис случаев (CaseApi.getCaseViewFromCasesService). */
+const CASES_SERVICE_8081 = 'http://localhost:8081/api/v1';
 // Добавить моковые данные для верификации
 const mockVerificationDetails: Record<string, CaseVerificationDetails> = {
   'CS-2024-001': {
@@ -348,6 +364,22 @@ let mockAttachments: CaseAttachment[] = [
   },
 ];
 
+function buildCaseViewItem(caseId: string): CaseViewItem | null {
+  const c = mockCases.find((row) => row.id === caseId);
+  if (!c) {
+    return null;
+  }
+  return {
+    ruleId: c.id,
+    ruleName: c.title,
+    ruleCondition: c.description,
+    details: { caseId: c.id, incidentIds: c.incidentIds },
+    investigationNotes: c.investigationNotes,
+    rootCause: c.rootCause,
+    requiresCorrectiveAction: c.requiresCorrectiveAction,
+    updatedAt: c.updatedAt,
+  };
+}
 
 export const casesHandlers = [
   // ... существующие обработчики ...
@@ -421,6 +453,36 @@ export const casesHandlers = [
     return HttpResponse.json(caseItem);
   }),
 
+  // GET /cases/:caseId/view — карточка просмотра (CaseApi.getCaseView)
+  http.get(`${API_BASE_URL}/cases/:caseId/view`, async ({ params }) => {
+    await delay(300);
+    const caseId = String(params.caseId);
+    console.log(`📄 [MSW] Fetching case view: ${caseId}`);
+    const view = buildCaseViewItem(caseId);
+    if (!view) {
+      return HttpResponse.json(
+        { message: 'Случай не найден', code: 'CASE_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+    return HttpResponse.json(view);
+  }),
+
+  // GET …/api/v1/cases/:caseId/view на порту 8081 (CaseApi.getCaseViewFromCasesService)
+  http.get(`${CASES_SERVICE_8081}/cases/:caseId/view`, async ({ params }) => {
+    await delay(300);
+    const caseId = String(params.caseId);
+    console.log(`📄 [MSW] Fetching case view (8081): ${caseId}`);
+    const view = buildCaseViewItem(caseId);
+    if (!view) {
+      return HttpResponse.json(
+        { message: 'Случай не найден', code: 'CASE_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+    return HttpResponse.json(view);
+  }),
+
   // POST /cases - Создать новый случай
   http.post(`${API_BASE_URL}/cases`, async ({ request }) => {
     await delay(500);
@@ -481,6 +543,34 @@ export const casesHandlers = [
     console.log(`🕵️ [MSW] Updating investigation for case ${caseId}:`, body);
 
     const index = mockCases.findIndex(c => c.id === caseId);
+
+    if (index === -1) {
+      return HttpResponse.json(
+        { message: 'Случай не найден', code: 'CASE_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+
+    mockCases[index] = {
+      ...mockCases[index],
+      investigationNotes: body.investigationNotes,
+      rootCause: body.rootCause,
+      requiresCorrectiveAction: body.requiresCorrectiveAction,
+      status: CaseStatus.INVESTIGATING,
+      updatedAt: new Date().toISOString(),
+    };
+
+    return HttpResponse.json(mockCases[index]);
+  }),
+
+  // PATCH /api/cases/:caseId/investigation — как в CaseApi.updateInvestigation (baseURL без /api/v1)
+  http.patch(`${CASES_LEGACY_API_BASE}/cases/:caseId/investigation`, async ({ request, params }) => {
+    await delay(400);
+    const { caseId } = params;
+    const body = await request.json() as UpdateInvestigationRequest;
+    console.log(`🕵️ [MSW] Updating investigation (legacy /api) for case ${caseId}:`, body);
+
+    const index = mockCases.findIndex((c) => c.id === caseId);
 
     if (index === -1) {
       return HttpResponse.json(

@@ -13,8 +13,10 @@ import type {
   ValidateScriptRequest,
   ValidateScriptResponse,
 } from '@shared/types/rulesTypes';
+import type { RuleShortInfo } from '@shared/types/incidentTypes';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1';
+const RULES_API_ROOT = API_BASE_URL.replace(/\/api\/v1\/?$/, '');
 
 // Моковые правила С GROOVY СКРИПТАМИ
 let mockRules: Rule[] = [
@@ -1207,5 +1209,44 @@ export const rulesHandlers = [
     const failed = Math.floor(Math.random() * 2);
     
     return HttpResponse.json({ imported, failed });
+  }),
+
+  // GET /api/rules/short/:ruleId — короткая карточка правила (RuleApi.getRuleShort)
+  http.get(`${RULES_API_ROOT}/api/rules/short/:ruleId`, async ({ params }) => {
+    await delay(200);
+    const ruleId = String(params.ruleId);
+    const rule = mockRules.find((r) => r.id === ruleId);
+
+    const fallback: RuleShortInfo = {
+      id: ruleId,
+      companyId: 'company-1',
+      name: `Правило ${ruleId}`,
+      condition: '—',
+      categoryId: 'COMPLIANCE',
+      priority: 'MEDIUM',
+      responsibleUserId: '2',
+    };
+
+    if (!rule) {
+      console.log(`📋 [MSW] Rule short fallback for unknown id: ${ruleId}`);
+      return HttpResponse.json(fallback);
+    }
+
+    const condition =
+      typeof rule.groovyScript === 'string' && rule.groovyScript.trim().length > 0
+        ? rule.groovyScript.slice(0, 400)
+        : rule.description.slice(0, 400);
+
+    const payload: RuleShortInfo = {
+      id: rule.id,
+      companyId: 'company-1',
+      name: rule.name,
+      condition,
+      categoryId: rule.category,
+      priority: rule.severity,
+      responsibleUserId: '2',
+    };
+
+    return HttpResponse.json(payload);
   }),
 ];

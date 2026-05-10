@@ -14,6 +14,7 @@ import {
   type ReassignIncidentRequest,
   type EscalateIncidentRequest,
   type IncidentAssignment,
+  type IncidentViewDto,
 } from '@shared/types/incidentTypes';
 import type { Case, CaseStatus } from '@shared/types/caseTypes';
 
@@ -742,7 +743,7 @@ export const incidentsHandlers = [
 
     const stats = {
       totalIncidents: mockIncidents.length,
-      totalFindings: mockFindings.length,
+      totalFindings: mockIncidents.length,
       totalCases: mockCases.length,
       new: mockIncidents.filter((i) => i.status === 'NEW').length,
       assigned: mockIncidents.filter((i) => i.status === 'ASSIGNED' || i.status === 'PARTLY_PROGRESS').length,
@@ -758,6 +759,47 @@ export const incidentsHandlers = [
     };
 
     return HttpResponse.json(stats);
+  }),
+
+  // GET /api/incidents/:incidentId/view — детальный просмотр (IncidentApi.getIncidentView)
+  http.get(`${API_ROOT}/api/incidents/:incidentId/view`, async ({ params }) => {
+    await delay(300);
+    const { incidentId } = params;
+    const id = String(incidentId);
+    console.log(`📄 [MSW] Fetching incident view: ${id}`);
+
+    const incident = mockIncidents.find((i) => i.id === id);
+    if (!incident) {
+      return HttpResponse.json(
+        { message: 'Инцидент не найден', code: 'INCIDENT_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
+
+    const view: IncidentViewDto = {
+      findings: [
+        {
+          id: `finding-${id}`,
+          priority: String(incident.severity),
+          assignedUserId: incident.assignedTo,
+          rulesId: incident.ruleId,
+          detectedAt: incident.detectedAt,
+          details: {
+            title: incident.title,
+            severity: incident.severity,
+            description: incident.description,
+            recommendation:
+              'Проверьте материалы инцидента, зафиксируйте решение и при необходимости создайте случай.',
+          },
+          incidentId: id,
+        },
+      ],
+      documentId: incident.sourceEventId,
+      integrationId: 0,
+      integrationName: incident.sourceSystem,
+    };
+
+    return HttpResponse.json(view);
   }),
 
   // GET /incidents/:incidentId - Получить инцидент по ID
