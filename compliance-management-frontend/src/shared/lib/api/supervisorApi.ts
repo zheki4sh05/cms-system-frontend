@@ -21,6 +21,8 @@ import type {
   ApproveVerificationRequest,
 } from '@shared/types/supervisorTypes';
 
+const boolStrict = (v: unknown): boolean => v === true;
+
 const num = (v: unknown, fallback = 0): number =>
   typeof v === 'number' && Number.isFinite(v) ? v : fallback;
 
@@ -74,6 +76,19 @@ const parseIncidentReceivedAt = (v: unknown): string | null => {
   if (v === null || v === undefined) return null;
   if (typeof v === 'string' && v.trim()) return v.trim();
   return null;
+};
+
+const parseRuleEffectivenessItem = (raw: unknown): RuleEffectiveness => {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  return {
+    ruleId: typeof r.ruleId === 'string' ? r.ruleId : String(r.ruleId ?? ''),
+    ruleName: typeof r.ruleName === 'string' ? r.ruleName : '',
+    categoryId: typeof r.categoryId === 'string' ? r.categoryId : String(r.categoryId ?? ''),
+    categoryName: typeof r.categoryName === 'string' ? r.categoryName : '',
+    rejectedCount: num(r.rejectedCount),
+    closedCount: num(r.closedCount),
+    ruleActive: boolStrict(r.ruleActive),
+  };
 };
 
 const parsePendingVerificationItem = (raw: unknown): PendingVerificationItem => {
@@ -324,11 +339,14 @@ export class SupervisorApi {
   }
 
   /**
-   * Получить эффективность правил
+   * Эффективность правил: кейсы REJECTED / CLOSED по ruleId (область по роли).
+   * GET /api/incidents/rule-effectiveness
    */
   static async getRuleEffectiveness(): Promise<RuleEffectiveness[]> {
-    const response = await apiClient.get<RuleEffectiveness[]>('/supervisor/analytics/rule-effectiveness');
-    return response.data;
+    const response = await apiClient.get<unknown>('/api/incidents/rule-effectiveness');
+    const payload = (response.data ?? {}) as Record<string, unknown>;
+    const itemsRaw = Array.isArray(payload.items) ? payload.items : [];
+    return itemsRaw.map(parseRuleEffectivenessItem);
   }
 
   /**

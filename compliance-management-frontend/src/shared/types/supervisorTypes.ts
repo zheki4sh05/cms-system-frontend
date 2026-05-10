@@ -65,23 +65,20 @@ export interface PendingVerificationResponse {
   items: PendingVerificationItem[];
 }
 
+/** Элемент списка GET /api/incidents/rule-effectiveness (поле items) */
 export interface RuleEffectiveness {
   ruleId: string;
   ruleName: string;
-  category: string;
-  
-  // Статистика срабатываний
-  totalTriggers: number;
-  truePositives: number;
-  falsePositives: number;
-  
-  // Эффективность
-  accuracy: number; // Процент
-  avgResolutionTime: number;
-  
-  // Действия
-  status: 'ACTIVE' | 'DISABLED' | 'UNDER_REVIEW';
-  lastModified: string;
+  categoryId: string;
+  categoryName: string;
+  rejectedCount: number;
+  closedCount: number;
+  /** Из CMS Risk: true только если enabled явно true */
+  ruleActive: boolean;
+}
+
+export interface RuleEffectivenessResponse {
+  items: RuleEffectiveness[];
 }
 
 export interface FinancialImpact {

@@ -8,7 +8,6 @@ import type {
   IncidentWorkflowStatusOverview,
 } from '@shared/types/incidentTypes';
 import type {
-  CategoryDistribution,
   PendingVerificationItem,
   RuleEffectiveness,
   SupervisorDashboardStats,
@@ -32,7 +31,6 @@ export interface SupervisorDashboardPdfInput {
   problemAreasData: IncidentProblemAreasResponse | null;
   incidentsOverview: IncidentsOverviewResponse | null;
   ruleEffectiveness: RuleEffectiveness[];
-  categoryDistribution: CategoryDistribution[];
 }
 
 type JsPdfWithFinalY = jsPDF & { lastAutoTable?: { finalY: number } };
@@ -387,37 +385,27 @@ export async function downloadSupervisorDashboardPdf(
   y += 18;
   const ruleRows =
     input.ruleEffectiveness.length === 0
-      ? [['—', '', '', '']]
-      : input.ruleEffectiveness.map((r) => [
-          escapeCell(r.ruleName, 36),
-          escapeCell(r.category, 22),
-          String(r.totalTriggers),
-          `${r.accuracy}%`,
-        ]);
+      ? [['—', '', '', '', '', '']]
+      : input.ruleEffectiveness.map((r) => {
+          const name = (r.ruleName ?? '').trim();
+          const cat = (r.categoryName ?? '').trim() || r.categoryId || '—';
+          const total = r.rejectedCount + r.closedCount;
+          return [
+            escapeCell(name || r.ruleId, 32),
+            escapeCell(cat, 22),
+            String(r.rejectedCount),
+            String(r.closedCount),
+            String(total),
+            r.ruleActive ? 'Да' : 'Нет',
+          ];
+        });
   autoTable(doc, {
     ...tableCommon,
     startY: y,
-    head: [['Правило', 'Категория', 'Сраб.', 'Точность']],
+    head: [
+      ['Правило', 'Категория', 'Откл.', 'Закр.', 'Всего', 'Активно'],
+    ],
     body: ruleRows,
-  });
-  bumpAfterTable();
-
-  doc.setFontSize(H2);
-  doc.text('Распределение по категориям', margin, y);
-  y += 18;
-  const catRows =
-    input.categoryDistribution.length === 0
-      ? [['—', '0', '']]
-      : input.categoryDistribution.map((c) => [
-          escapeCell(c.category, 40),
-          String(c.count),
-          `${c.percentage}% (${c.trend >= 0 ? '+' : ''}${c.trend}%)`,
-        ]);
-  autoTable(doc, {
-    ...tableCommon,
-    startY: y,
-    head: [['Категория', 'Кол-во', '% и тренд']],
-    body: catRows,
   });
   bumpAfterTable();
 

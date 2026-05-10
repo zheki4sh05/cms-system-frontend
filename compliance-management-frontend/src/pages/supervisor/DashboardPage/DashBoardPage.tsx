@@ -80,7 +80,6 @@ import type {
   PendingVerificationItem,
   VerificationResponsible,
   RuleEffectiveness,
-  CategoryDistribution,
 } from '@shared/types/supervisorTypes';
 
 const verificationListTitle = (item: PendingVerificationItem) =>
@@ -220,7 +219,6 @@ export const SupervisorDashboardPage: FC = observer(() => {
     null
   );
   const [ruleEffectiveness, setRuleEffectiveness] = useState<RuleEffectiveness[]>([]);
-  const [categoryDistribution, setCategoryDistribution] = useState<CategoryDistribution[]>([]);
   const [incidentsOverview, setIncidentsOverview] = useState<IncidentsOverviewResponse | null>(
     null
   );
@@ -252,7 +250,6 @@ export const SupervisorDashboardPage: FC = observer(() => {
         SupervisorApi.getVerificationQueue(),
         SupervisorApi.getProblemAreas(),
         SupervisorApi.getRuleEffectiveness(),
-        SupervisorApi.getCategoryDistribution(),
         SupervisorApi.getIncidentsOverview(),
       ]);
 
@@ -271,12 +268,9 @@ export const SupervisorDashboardPage: FC = observer(() => {
       if (settled[3].status === 'fulfilled') setRuleEffectiveness(settled[3].value);
       else console.error('Failed to load rule effectiveness:', settled[3].reason);
 
-      if (settled[4].status === 'fulfilled') setCategoryDistribution(settled[4].value);
-      else console.error('Failed to load category distribution:', settled[4].reason);
-
-      if (settled[5].status === 'fulfilled') setIncidentsOverview(settled[5].value);
+      if (settled[4].status === 'fulfilled') setIncidentsOverview(settled[4].value);
       else {
-        console.error('Failed to load incidents overview:', settled[5].reason);
+        console.error('Failed to load incidents overview:', settled[4].reason);
         setIncidentsOverview(null);
       }
     } catch (error) {
@@ -330,7 +324,6 @@ export const SupervisorDashboardPage: FC = observer(() => {
         problemAreasData,
         incidentsOverview,
         ruleEffectiveness,
-        categoryDistribution,
       });
     } catch (error) {
       console.error('Failed to export dashboard PDF:', error);
@@ -1096,10 +1089,9 @@ export const SupervisorDashboardPage: FC = observer(() => {
           </Grid>
         </Grid>
 
-        {/* Нижняя секция - Эффективность правил и категории */}
+        {/* Нижняя секция — эффективность правил */}
         <Grid container spacing={3} sx={{ mt: 0 }}>
-          {/* Эффективность правил */}
-          <Grid size={{xs:12, lg:8}}>
+          <Grid size={{ xs: 12 }}>
             <Card>
               <CardHeader
                 title="Эффективность правил"
@@ -1108,112 +1100,72 @@ export const SupervisorDashboardPage: FC = observer(() => {
               />
               <Divider />
               <CardContent>
+                {ruleEffectiveness.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    Нет данных по правилам для отображения.
+                  </Typography>
+                ) : (
                 <TableContainer sx={{ maxHeight: 400 }}>
                   <Table stickyHeader size="small">
                     <TableHead>
                       <TableRow>
                         <TableCell>Правило</TableCell>
                         <TableCell>Категория</TableCell>
-                        <TableCell align="center">Срабатываний</TableCell>
-                        <TableCell align="center">Точность</TableCell>
-                        <TableCell align="center">Ср. время</TableCell>
-                        <TableCell>Статус</TableCell>
+                        <TableCell align="center">Отклонено (REJECTED)</TableCell>
+                        <TableCell align="center">Закрыто (CLOSED)</TableCell>
+                        <TableCell align="center">Всего кейсов</TableCell>
+                        <TableCell>Правило в CMS</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {ruleEffectiveness.map((rule) => (
+                      {ruleEffectiveness.map((rule) => {
+                        const name = rule.ruleName.trim();
+                        const catLabel = rule.categoryName.trim() || rule.categoryId || '—';
+                        const totalCases = rule.rejectedCount + rule.closedCount;
+                        return (
                         <TableRow key={rule.ruleId} hover>
                           <TableCell>
                             <Typography variant="body2" fontWeight="medium">
-                              {rule.ruleName}
+                              {name || '—'}
                             </Typography>
+                            {!name && (
+                              <Typography variant="caption" color="text.secondary" display="block" fontFamily="monospace">
+                                {rule.ruleId}
+                              </Typography>
+                            )}
                           </TableCell>
                           <TableCell>
-                            <Chip label={rule.category} size="small" variant="outlined" />
+                            {rule.categoryId ? (
+                              <Tooltip title={`Идентификатор категории: ${rule.categoryId}`}>
+                                <Chip label={catLabel} size="small" variant="outlined" />
+                              </Tooltip>
+                            ) : (
+                              <Chip label={catLabel} size="small" variant="outlined" />
+                            )}
                           </TableCell>
                           <TableCell align="center">
-                            <Typography variant="body2">
-                              {rule.totalTriggers}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {rule.truePositives} / {rule.falsePositives}
-                            </Typography>
+                            <Typography variant="body2">{rule.rejectedCount}</Typography>
                           </TableCell>
                           <TableCell align="center">
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                              <Typography
-                                variant="body2"
-                                fontWeight="bold"
-                                color={rule.accuracy >= 80 ? 'success.main' : rule.accuracy >= 60 ? 'warning.main' : 'error.main'}
-                              >
-                                {rule.accuracy}%
-                              </Typography>
-                            </Box>
-                            <LinearProgress
-                              variant="determinate"
-                              value={rule.accuracy}
-                              color={rule.accuracy >= 80 ? 'success' : rule.accuracy >= 60 ? 'warning' : 'error'}
-                              sx={{ width: 60, height: 4, borderRadius: 1, mx: 'auto', mt: 0.5 }}
-                            />
+                            <Typography variant="body2">{rule.closedCount}</Typography>
                           </TableCell>
                           <TableCell align="center">
-                            <Typography variant="body2">
-                              {rule.avgResolutionTime}ч
-                            </Typography>
+                            <Typography variant="body2">{totalCases}</Typography>
                           </TableCell>
                           <TableCell>
                             <Chip
-                              label={rule.status === 'ACTIVE' ? 'Активно' : rule.status === 'DISABLED' ? 'Отключено' : 'На проверке'}
+                              label={rule.ruleActive ? 'Активно' : 'Неактивно'}
                               size="small"
-                              color={rule.status === 'ACTIVE' ? 'success' : rule.status === 'DISABLED' ? 'default' : 'warning'}
+                              color={rule.ruleActive ? 'success' : 'default'}
                             />
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </TableContainer>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Распределение по категориям */}
-          <Grid size={{xs:12, lg:4}}>
-            <Card sx={{ height: '100%' }}>
-              <CardHeader
-                title="Распределение по категориям"
-                avatar={<AssessmentIcon color="info" />}
-              />
-              <Divider />
-              <CardContent>
-                <Stack spacing={2}>
-                  {categoryDistribution.map((cat) => (
-                    <Box key={cat.category}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                        <Typography variant="body2">{cat.category}</Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="body2" fontWeight="bold">
-                            {cat.count}
-                          </Typography>
-                          {getTrendIcon(cat.trend)}
-                          <Typography variant="caption" color="text.secondary">
-                            {Math.abs(cat.trend)}%
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <LinearProgress
-                          variant="determinate"
-                          value={cat.percentage}
-                          sx={{ flexGrow: 1, height: 8, borderRadius: 1 }}
-                        />
-                        <Typography variant="caption" color="text.secondary" sx={{ minWidth: 40 }}>
-                          {cat.percentage}%
-                        </Typography>
-                      </Box>
-                    </Box>
-                  ))}
-                </Stack>
+                )}
               </CardContent>
             </Card>
           </Grid>

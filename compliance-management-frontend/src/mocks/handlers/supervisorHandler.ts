@@ -230,103 +230,52 @@ const mockProblemAreasResponseBase: IncidentProblemAreasResponse = {
   ],
 };
 
-// Моковая эффективность правил
+// GET /api/incidents/rule-effectiveness
 const mockRuleEffectiveness: RuleEffectiveness[] = [
   {
-    ruleId: 'RULE-001',
+    ruleId: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
     ruleName: 'Конфликт интересов при закупках',
-    category: 'Этика',
-    totalTriggers: 8,
-    truePositives: 8,
-    falsePositives: 0,
-    accuracy: 100,
-    avgResolutionTime: 48,
-    status: 'ACTIVE',
-    lastModified: '2024-11-15T10:00:00Z',
+    categoryId: 'a1b2c3d4-5717-4562-b3fc-2c963f66afa6',
+    categoryName: 'Этика',
+    rejectedCount: 0,
+    closedCount: 8,
+    ruleActive: true,
   },
   {
-    ruleId: 'RULE-002',
+    ruleId: '4fa85f64-5717-4562-b3fc-2c963f66afa7',
     ruleName: 'Превышение лимита без согласования',
-    category: 'Финансы',
-    totalTriggers: 45,
-    truePositives: 41,
-    falsePositives: 4,
-    accuracy: 91,
-    avgResolutionTime: 24,
-    status: 'ACTIVE',
-    lastModified: '2024-10-20T14:30:00Z',
+    categoryId: 'b2c3d4e5-5717-4562-b3fc-2c963f66afa7',
+    categoryName: 'Финансы',
+    rejectedCount: 4,
+    closedCount: 41,
+    ruleActive: true,
   },
   {
-    ruleId: 'RULE-003',
+    ruleId: '5fa85f64-5717-4562-b3fc-2c963f66afa8',
     ruleName: 'Истекшая лицензия поставщика',
-    category: 'Комплаенс',
-    totalTriggers: 12,
-    truePositives: 11,
-    falsePositives: 1,
-    accuracy: 92,
-    avgResolutionTime: 18,
-    status: 'ACTIVE',
-    lastModified: '2024-09-10T09:00:00Z',
+    categoryId: 'c3d4e5f6-5717-4562-b3fc-2c963f66afa8',
+    categoryName: 'Комплаенс',
+    rejectedCount: 1,
+    closedCount: 11,
+    ruleActive: true,
   },
   {
-    ruleId: 'RULE-004',
+    ruleId: '6fa85f64-5717-4562-b3fc-2c963f66afa9',
     ruleName: 'Систематическое нарушение сроков',
-    category: 'Логистика',
-    totalTriggers: 28,
-    truePositives: 23,
-    falsePositives: 5,
-    accuracy: 82,
-    avgResolutionTime: 36,
-    status: 'UNDER_REVIEW',
-    lastModified: '2024-11-25T16:00:00Z',
+    categoryId: 'd4e5f6a7-5717-4562-b3fc-2c963f66afa9',
+    categoryName: 'Логистика',
+    rejectedCount: 5,
+    closedCount: 23,
+    ruleActive: false,
   },
   {
-    ruleId: 'RULE-005',
-    ruleName: 'Дубликаты контрагентов',
-    category: 'Качество данных',
-    totalTriggers: 19,
-    truePositives: 15,
-    falsePositives: 4,
-    accuracy: 79,
-    avgResolutionTime: 12,
-    status: 'UNDER_REVIEW',
-    lastModified: '2024-11-01T11:30:00Z',
-  },
-  {
-    ruleId: 'RULE-006',
-    ruleName: 'Изменение цен после согласования',
-    category: 'Финансы',
-    totalTriggers: 34,
-    truePositives: 30,
-    falsePositives: 4,
-    accuracy: 88,
-    avgResolutionTime: 28,
-    status: 'ACTIVE',
-    lastModified: '2024-10-05T13:00:00Z',
-  },
-  {
-    ruleId: 'RULE-007',
-    ruleName: 'Нарушение требований по НДС',
-    category: 'Комплаенс',
-    totalTriggers: 7,
-    truePositives: 5,
-    falsePositives: 2,
-    accuracy: 71,
-    avgResolutionTime: 22,
-    status: 'UNDER_REVIEW',
-    lastModified: '2024-11-10T10:15:00Z',
-  },
-  {
-    ruleId: 'RULE-008',
-    ruleName: 'Превышение рыночной цены',
-    category: 'Финансы',
-    totalTriggers: 23,
-    truePositives: 14,
-    falsePositives: 9,
-    accuracy: 61,
-    avgResolutionTime: 16,
-    status: 'DISABLED',
-    lastModified: '2024-11-28T15:45:00Z',
+    ruleId: '7fa85f64-5717-4562-b3fc-2c963f66afaa',
+    ruleName: '',
+    categoryId: 'e5f6a7b8-5717-4562-b3fc-2c963f66afaa',
+    categoryName: 'Качество данных',
+    rejectedCount: 2,
+    closedCount: 15,
+    ruleActive: false,
   },
 ];
 
@@ -399,11 +348,11 @@ export const supervisorHandlers = [
     });
   }),
 
-  // GET /supervisor/analytics/rule-effectiveness - Получить эффективность правил
-  http.get(`${API_BASE_URL}/supervisor/analytics/rule-effectiveness`, async () => {
+  // GET /api/incidents/rule-effectiveness
+  http.get(`${API_ROOT}/api/incidents/rule-effectiveness`, async () => {
     await delay(450);
-    console.log('📈 [MSW] Fetching rule effectiveness');
-    return HttpResponse.json(mockRuleEffectiveness);
+    console.log('📈 [MSW] Fetching rule effectiveness (incidents API)');
+    return HttpResponse.json({ items: mockRuleEffectiveness });
   }),
 
   // GET /supervisor/analytics/financial-impact - Получить финансовое влияние
