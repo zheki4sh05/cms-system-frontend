@@ -70,6 +70,7 @@ const mockManagersKpiItems: TeamKPI[] = [
 const mockIncidentsOverview: IncidentsOverviewResponse = {
   scope: 'DEPARTMENT',
   incidents: {
+    total: 31,
     byStatus: {
       OPEN: 4,
       PARTLY_PROGRESS: 6,
@@ -780,21 +781,33 @@ export const incidentsHandlers = [
     await delay(300);
     console.log('📊 [MSW] Fetching incident statistics');
     
+    const newC = mockIncidents.filter((i) => i.status === 'NEW').length;
+    const assignedC = mockIncidents.filter(
+      (i) => i.status === 'ASSIGNED' || i.status === 'PARTLY_PROGRESS'
+    ).length;
+    const inReviewC = mockIncidents.filter((i) => i.status === 'IN_REVIEW').length;
+    const resolvedC = mockIncidents.filter((i) => i.status === 'RESOLVED').length;
+    const highSev = mockIncidents.filter((i) => i.severity === 'HIGH').length;
+
     const statistics: IncidentStatistics = {
-      new: mockIncidents.filter(i => i.status === 'NEW').length,
-      assigned: mockIncidents.filter(
-        i => i.status === 'ASSIGNED' || i.status === 'PARTLY_PROGRESS'
-      ).length,
-      inReview: mockIncidents.filter(i => i.status === 'IN_REVIEW').length,
-      resolved: mockIncidents.filter(i => i.status === 'RESOLVED').length,
+      totalIncidents: mockIncidents.length,
+      totalFindings: mockIncidents.length,
+      totalCases: mockCases.length,
+      new: newC,
+      assigned: assignedC,
+      inReview: inReviewC,
+      resolved: resolvedC,
       bySeverity: {
-        low: mockIncidents.filter(i => i.severity === 'LOW').length,
-        medium: mockIncidents.filter(i => i.severity === 'MEDIUM').length,
-        high: mockIncidents.filter(i => i.severity === 'HIGH').length,
-        critical: mockIncidents.filter(i => i.severity === 'CRITICAL').length,
+        low: mockIncidents.filter((i) => i.severity === 'LOW').length,
+        medium: mockIncidents.filter((i) => i.severity === 'MEDIUM').length,
+        high: highSev,
+        critical: mockIncidents.filter((i) => i.severity === 'CRITICAL').length,
       },
       byCategory: [],
-      avgResolutionTime: 36, // В часах
+      avgResolutionTime: 36,
+      criticalIncidents: highSev,
+      overdueActionPlans: 2,
+      pendingVerifications: 3,
     };
     
     return HttpResponse.json(statistics);
@@ -828,6 +841,7 @@ export const incidentsHandlers = [
       }
     });
 
+    const highCount = mockIncidents.filter((i) => i.severity === 'HIGH').length;
     const stats = {
       totalIncidents: mockIncidents.length,
       totalFindings: mockIncidents.length,
@@ -839,10 +853,13 @@ export const incidentsHandlers = [
       bySeverity: {
         low: mockIncidents.filter((i) => i.severity === 'LOW').length,
         medium: mockIncidents.filter((i) => i.severity === 'MEDIUM').length,
-        high: mockIncidents.filter((i) => i.severity === 'HIGH').length,
+        high: highCount,
       },
       byCategory: Array.from(categoryMap.values()),
       avgResolutionTime: 36,
+      criticalIncidents: highCount,
+      overdueActionPlans: 2,
+      pendingVerifications: 3,
     };
 
     return HttpResponse.json(stats);

@@ -9,7 +9,6 @@ import {
   DescriptionOutlined,
   BusinessOutlined,
   HelpOutlineOutlined,
-  ArchiveOutlined,
 } from '@mui/icons-material';
 import { type SvgIconTypeMap } from '@mui/material';
 import { type OverridableComponent } from '@mui/material/OverridableComponent';
@@ -62,13 +61,6 @@ export const navigationItems: NavigationItem[] = [
     icon: RuleIcon,
     roles: [UserRoleValues.MANAGER],
   },
-  {
-    id: 'manager-archive',
-    label: 'Архив',
-    path: '/manager/archive',
-    icon: ArchiveOutlined,
-    roles: [UserRoleValues.MANAGER],
-  },
 
   // ========== РУКОВОДИТЕЛЬ ==========
   {
@@ -106,13 +98,6 @@ export const navigationItems: NavigationItem[] = [
     icon: HelpOutlineOutlined,
     roles: [UserRoleValues.SUPERVISOR],
   },
-  {
-    id: 'supervisor-archive',
-    label: 'Архив',
-    path: '/supervisor/archive',
-    icon: ArchiveOutlined,
-    roles: [UserRoleValues.SUPERVISOR],
-  },
 
   // ========== ТОП-МЕНЕДЖМЕНТ ==========
   {
@@ -141,13 +126,6 @@ export const navigationItems: NavigationItem[] = [
     label: 'Помощь',
     path: '/executive/help',
     icon: HelpOutlineOutlined,
-    roles: [UserRoleValues.EXECUTIVE],
-  },
-  {
-    id: 'executive-archive',
-    label: 'Архив',
-    path: '/executive/archive',
-    icon: ArchiveOutlined,
     roles: [UserRoleValues.EXECUTIVE],
   },
 ];

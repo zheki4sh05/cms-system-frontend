@@ -22,7 +22,7 @@ export interface SupervisorDashboardStats {
   escalationRate: number; // Процент инцидентов, переведенных в случаи
 }
 
-/** Элемент списка GET /api/incidents/kpi/managers (поле items) */
+/** Элемент списка GET /api/incidents/kpi/managers (поле items). Для SUPERVISOR — подчинённые; для EXECUTIVE — компания. */
 export interface TeamKPI {
   managerId: string;
   managerName: string;

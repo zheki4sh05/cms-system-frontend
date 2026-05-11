@@ -16,6 +16,8 @@ export interface UserMeResponse {
   lastName?: string;
   email: string;
   role: string;
+  /** Доступ к отдельной админ-панели (URL из VITE_ADMIN_PANEL_URL) */
+  hasAdminAccess?: boolean;
   companyId?: string;
   employeeId?: string;
   /** Устаревшее плоское поле; приоритет у employeeInternal */

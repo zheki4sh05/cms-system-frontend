@@ -155,8 +155,29 @@ export class IncidentApi {
     return response.data.map((incident) => this.normalizeIncident(incident));
   }
 
+  /** categoryId в ответе может быть строкой или объектом (в т.ч. пустым {}) */
+  private static parseStatsCategoryId(value: unknown): string | null {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string') {
+      const t = value.trim();
+      return t.length > 0 ? t : null;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (typeof value === 'object' && value !== null && Object.keys(value as object).length === 0) {
+      return null;
+    }
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
   /**
-   * Получить статистику по инцидентам
+   * Статистика инцидентов: GET /api/incidents/my/stats (для EXECUTIVE — компания целиком).
    */
   static async getIncidentStatistics(): Promise<IncidentStatistics> {
     const response = await apiClient.get<unknown>('/api/incidents/my/stats');
@@ -168,29 +189,56 @@ export class IncidentApi {
         : {};
     const rawByCategory = Array.isArray(payload.byCategory) ? payload.byCategory : [];
 
+    const n = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+
+    const newC = n(payload.new);
+    const assignedC = n(payload.assigned);
+    const inReviewC = n(payload.inReview);
+    const resolvedC = n(payload.resolved);
+
+    const low = n(rawBySeverity.low);
+    const medium = n(rawBySeverity.medium);
+    const high = n(rawBySeverity.high);
+    const criticalSev = n(rawBySeverity.critical);
+
+    const byCategory = rawByCategory.map((entry) => {
+      const value = (entry ?? {}) as Record<string, unknown>;
+      const cid = this.parseStatsCategoryId(value.categoryId);
+      return {
+        categoryId: cid,
+        categoryName:
+          typeof value.categoryName === 'string' && value.categoryName.trim().length > 0
+            ? value.categoryName.trim()
+            : 'Без категории',
+        incidentCount: n(value.incidentCount),
+      };
+    });
+    byCategory.sort((a, b) => a.categoryName.localeCompare(b.categoryName, 'ru'));
+
+    const totalIncidents =
+      typeof payload.totalIncidents === 'number' ? n(payload.totalIncidents) : newC + assignedC + inReviewC + resolvedC;
+    const criticalIncidents =
+      typeof payload.criticalIncidents === 'number' ? n(payload.criticalIncidents) : high;
+
     return {
-      new: typeof payload.new === 'number' ? payload.new : 0,
-      assigned: typeof payload.assigned === 'number' ? payload.assigned : 0,
-      inReview: typeof payload.inReview === 'number' ? payload.inReview : 0,
-      resolved: typeof payload.resolved === 'number' ? payload.resolved : 0,
+      totalIncidents,
+      totalFindings: typeof payload.totalFindings === 'number' ? n(payload.totalFindings) : 0,
+      totalCases: typeof payload.totalCases === 'number' ? n(payload.totalCases) : 0,
+      new: newC,
+      assigned: assignedC,
+      inReview: inReviewC,
+      resolved: resolvedC,
       bySeverity: {
-        low: typeof rawBySeverity.low === 'number' ? rawBySeverity.low : 0,
-        medium: typeof rawBySeverity.medium === 'number' ? rawBySeverity.medium : 0,
-        high: typeof rawBySeverity.high === 'number' ? rawBySeverity.high : 0,
-        critical: typeof rawBySeverity.critical === 'number' ? rawBySeverity.critical : 0,
+        low,
+        medium,
+        high,
+        critical: criticalSev > 0 ? criticalSev : undefined,
       },
-      byCategory: rawByCategory.map((entry) => {
-        const value = (entry ?? {}) as Record<string, unknown>;
-        return {
-          categoryId: typeof value.categoryId === 'string' ? value.categoryId : null,
-          categoryName:
-            typeof value.categoryName === 'string' && value.categoryName.length > 0
-              ? value.categoryName
-              : 'Без категории',
-          incidentCount: typeof value.incidentCount === 'number' ? value.incidentCount : 0,
-        };
-      }),
-      avgResolutionTime: typeof payload.avgResolutionTime === 'number' ? payload.avgResolutionTime : 0,
+      byCategory,
+      avgResolutionTime: n(payload.avgResolutionTime),
+      criticalIncidents,
+      overdueActionPlans: n(payload.overdueActionPlans),
+      pendingVerifications: n(payload.pendingVerifications),
     };
   }
 

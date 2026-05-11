@@ -18,6 +18,8 @@ export interface User {
   /** Подгружается после логина: GET /departments/{departmentId} */
   departmentName?: string;
   isFirstLogin?: boolean;
+  /** Из GET /api/users/me — показ ссылки на админ-панель */
+  hasAdminAccess?: boolean;
 }
 
 export interface AuthTokens {

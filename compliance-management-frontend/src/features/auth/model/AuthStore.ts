@@ -64,6 +64,7 @@ export class AuthStore {
       employeeId,
       departmentId,
       departmentName,
+      hasAdminAccess: profile.hasAdminAccess ?? user.hasAdminAccess,
     };
   }
 

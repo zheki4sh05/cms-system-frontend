@@ -26,6 +26,7 @@ import {
   DescriptionOutlined,
   BusinessOutlined,
   ApartmentOutlined,
+  AdminPanelSettingsOutlined,
 } from '@mui/icons-material';
 import { useAuthStore } from '@features/auth/useAuthStore';
 import { getNavigationByRole } from './../Layout/navigationConfig';
@@ -52,6 +53,9 @@ export const Sidebar: FC<SidebarProps> = observer(({
   const location = useLocation();
 
   const navigationItems = getNavigationByRole(authStore.userRole);
+  const adminPanelUrl = (import.meta.env.VITE_ADMIN_PANEL_URL ?? '').trim();
+  const showAdminPanelLink =
+    Boolean(authStore.user?.hasAdminAccess) && adminPanelUrl.length > 0;
 
   // Состояние раскрытия секции "Дополнительно"
   const [additionalOpen, setAdditionalOpen] = useState(false);
@@ -184,6 +188,37 @@ export const Sidebar: FC<SidebarProps> = observer(({
               </Tooltip>
             );
           })}
+
+          {showAdminPanelLink && (
+            <Tooltip
+              title={!open ? 'Перейти в админ-панель' : ''}
+              placement="right"
+            >
+              <ListItemButton
+                component="a"
+                href={adminPanelUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{
+                  borderRadius: 1,
+                  mb: 0.5,
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 40 }}>
+                  <AdminPanelSettingsOutlined />
+                </ListItemIcon>
+                {open && (
+                  <ListItemText
+                    primary="Перейти в админ-панель"
+                    primaryTypographyProps={{
+                      fontSize: '0.875rem',
+                      fontWeight: 400,
+                    }}
+                  />
+                )}
+              </ListItemButton>
+            </Tooltip>
+          )}
         </List>
 
         <Divider />

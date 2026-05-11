@@ -136,7 +136,11 @@ export interface Incident {
   falsePositiveReason?: string;
 }
 
+/** GET /api/incidents/my/stats — для EXECUTIVE полный охват компании; для других ролей — по правам бэкенда */
 export interface IncidentStatistics {
+  totalIncidents: number;
+  totalFindings: number;
+  totalCases: number;
   new: number;
   assigned: number;
   inReview: number;
@@ -150,12 +154,17 @@ export interface IncidentStatistics {
   };
 
   byCategory: Array<{
+    /** Может прийти строкой или объектом (например пустой {}) */
     categoryId: string | null;
     categoryName: string;
     incidentCount: number;
   }>;
 
   avgResolutionTime: number; // В часах
+  /** По сути дублирует bySeverity.high для компании */
+  criticalIncidents: number;
+  overdueActionPlans: number;
+  pendingVerifications: number;
 }
 
 export interface IncidentSummaryStats {
@@ -367,6 +376,8 @@ export type IncidentsOverviewScope = 'COMPANY' | 'DEPARTMENT';
 export type IncidentWorkflowStatusOverview = 'OPEN' | 'PARTLY_PROGRESS' | 'IN_PROGRESS' | 'RESOLVED';
 
 export interface IncidentsOverviewIncidentsBlock {
+  /** Число инцидентов в выборке: из поля total API или сумма по статусам */
+  total: number;
   /** Количества по статусам инцидента */
   byStatus: Partial<Record<IncidentWorkflowStatusOverview, number>>;
   withDocumentId: number;

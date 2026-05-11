@@ -80,11 +80,24 @@ const parseIncidentReceivedAt = (v: unknown): string | null => {
 
 const parseRuleEffectivenessItem = (raw: unknown): RuleEffectiveness => {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const categoryIdParsed =
+    parseDocumentTitle(r.categoryId) ??
+    (typeof r.categoryId === 'string' ? r.categoryId.trim() : null) ??
+    (r.categoryId != null && (typeof r.categoryId === 'number' || typeof r.categoryId === 'boolean')
+      ? String(r.categoryId)
+      : null);
+  const categoryNameParsed =
+    parseDocumentTitle(r.categoryName) ??
+    (typeof r.categoryName === 'string' ? r.categoryName.trim() : null) ??
+    (r.categoryName != null &&
+    (typeof r.categoryName === 'number' || typeof r.categoryName === 'boolean')
+      ? String(r.categoryName)
+      : null);
   return {
     ruleId: typeof r.ruleId === 'string' ? r.ruleId : String(r.ruleId ?? ''),
     ruleName: typeof r.ruleName === 'string' ? r.ruleName : '',
-    categoryId: typeof r.categoryId === 'string' ? r.categoryId : String(r.categoryId ?? ''),
-    categoryName: typeof r.categoryName === 'string' ? r.categoryName : '',
+    categoryId: categoryIdParsed ?? '',
+    categoryName: categoryNameParsed ?? '',
     rejectedCount: num(r.rejectedCount),
     closedCount: num(r.closedCount),
     ruleActive: boolStrict(r.ruleActive),
@@ -156,6 +169,13 @@ const parseIncidentStatusOverviewBlock = (
   return out;
 };
 
+/** Имя объекта риска в overview: строка или объект (мониторинг) */
+const hotspotRiskObjectName = (raw: unknown): string | null => {
+  const direct = strOrNull(raw);
+  if (direct) return direct;
+  return parseDocumentTitle(raw);
+};
+
 const parseRiskHotspotsOverview = (raw: unknown): IncidentRiskHotspotItem[] => {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -165,7 +185,7 @@ const parseRiskHotspotsOverview = (raw: unknown): IncidentRiskHotspotItem[] => {
       return {
         riskObjectId: typeof rid === 'string' ? rid : String(rid ?? ''),
         incidentCount: num(row.incidentCount ?? row.incident_count),
-        name: strOrNull(row.name ?? row.displayName ?? row.title ?? row.riskObjectName),
+        name: strOrNull(row.name ?? row.displayName ?? row.title) ?? hotspotRiskObjectName(row.riskObjectName),
       };
     })
     .slice(0, 5);
@@ -193,6 +213,12 @@ const parseIncidentsOverviewPayload = (raw: unknown): IncidentsOverviewResponse 
 
   const inc = pickRecord(p.incidents);
   const incidentsByStatus = parseIncidentStatusOverviewBlock(inc);
+  const statusSum = (
+    ['OPEN', 'PARTLY_PROGRESS', 'IN_PROGRESS', 'RESOLVED'] as const
+  ).reduce((s, k) => s + (incidentsByStatus[k] ?? 0), 0);
+  const incidentsTotal =
+    typeof inc.total === 'number' && Number.isFinite(inc.total) ? num(inc.total) : statusSum;
+
   const findings = pickRecord(p.findings);
   const casesBlk = pickRecord(p.cases);
   const plans = pickRecord(p.actionPlans ?? p.action_plans ?? {});
@@ -213,9 +239,20 @@ const parseIncidentsOverviewPayload = (raw: unknown): IncidentsOverviewResponse 
   return {
     scope,
     incidents: {
+      total: incidentsTotal,
       byStatus: incidentsByStatus,
-      withDocumentId: num(inc.withDocumentId ?? inc.with_document_id),
-      withoutDocumentId: num(inc.withoutDocumentId ?? inc.without_document_id),
+      withDocumentId: num(
+        inc.withDocumentId ??
+          inc.with_document_id ??
+          inc.linkedToDocument ??
+          inc.linked_to_document
+      ),
+      withoutDocumentId: num(
+        inc.withoutDocumentId ??
+          inc.without_document_id ??
+          inc.withoutDocument ??
+          inc.without_document
+      ),
       staleUnresolved: num(inc.staleUnresolved ?? inc.stale_unresolved),
     },
     findings: {
@@ -276,7 +313,7 @@ export class SupervisorApi {
   }
 
   /**
-   * KPI менеджеров команды (супервизор): GET /api/incidents/kpi/managers
+   * KPI менеджеров: GET /api/incidents/kpi/managers (область данных по роли: SUPERVISOR / EXECUTIVE).
    */
   static async getTeamKPI(): Promise<TeamKPI[]> {
     const response = await apiClient.get<unknown>('/api/incidents/kpi/managers');
