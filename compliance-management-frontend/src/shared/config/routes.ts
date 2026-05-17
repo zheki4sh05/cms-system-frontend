@@ -10,7 +10,6 @@ export const ROUTES = {
   SUPERVISOR: {
     DASHBOARD: '/supervisor/dashboard',
     INCIDENTS_CASES: '/supervisor/incidents-cases',
-    ANALYTICS: '/supervisor/analytics',
     ARCHIVE: '/supervisor/archive',
   },
   EXECUTIVE: {

@@ -33,6 +33,7 @@ import {
   type ArchivePlanItem,
 } from '@shared/lib/api/archiveApi';
 import { CASE_STATUS_LABELS_RU, INCIDENT_STATUS_LABELS_RU } from '@shared/lib/statusLabels';
+import { getSeverityLabelRu, getWorkflowPriorityLabelRu } from '@shared/lib/domainLabelsRu';
 
 type ArchiveTab = 'incidents' | 'nonCompliance' | 'cases' | 'investigationPlans';
 
@@ -283,7 +284,7 @@ export const ArchivePage: FC = observer(() => {
                         <TableRow key={item.id}>
                           <TableCell>{item.id}</TableCell>
                           <TableCell>{item.title}</TableCell>
-                          <TableCell>{item.severity}</TableCell>
+                          <TableCell>{getSeverityLabelRu(item.severity)}</TableCell>
                           <TableCell>{incidentStatusLabel[item.status] ?? item.status}</TableCell>
                           <TableCell>{new Date(item.resolvedAt).toLocaleDateString('ru-RU')}</TableCell>
                         </TableRow>
@@ -365,7 +366,7 @@ export const ArchivePage: FC = observer(() => {
                           <TableCell>{item.source}</TableCell>
                           <TableCell>{item.category}</TableCell>
                           <TableCell>
-                            <Chip size="small" label={item.severity} />
+                            <Chip size="small" label={getSeverityLabelRu(item.severity)} />
                           </TableCell>
                           <TableCell>{new Date(item.date).toLocaleDateString('ru-RU')}</TableCell>
                         </TableRow>
@@ -443,7 +444,7 @@ export const ArchivePage: FC = observer(() => {
                           <TableCell>{item.id}</TableCell>
                           <TableCell>{item.title}</TableCell>
                           <TableCell>{caseStatusLabel[item.status] ?? item.status}</TableCell>
-                          <TableCell>{item.priority}</TableCell>
+                          <TableCell>{getWorkflowPriorityLabelRu(item.priority)}</TableCell>
                           <TableCell>{item.ownerName}</TableCell>
                           <TableCell>{new Date(item.updatedAt).toLocaleDateString('ru-RU')}</TableCell>
                         </TableRow>

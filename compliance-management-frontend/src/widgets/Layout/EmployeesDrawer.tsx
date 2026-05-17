@@ -144,6 +144,13 @@ export const EmployeesDrawer: FC<EmployeesDrawerProps> = observer(({ open, onClo
     void loadEmployees();
   }, [open, loadEmployees]);
 
+  useEffect(() => {
+    if (open) {
+      return;
+    }
+    setInviteDialogOpen(false);
+  }, [open]);
+
   // Обработка отправки приглашения
   const handleInvite = async (email: string, role: UserRole, departmentId?: string) => {
     if (!authStore.user?.id) {

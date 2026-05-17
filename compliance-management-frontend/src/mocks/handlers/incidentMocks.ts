@@ -213,6 +213,10 @@ let mockIncidents: Incident[] = [
     assignedTo: '2',
     assignedToName: 'Петр Петров',
     employees: [{ userId: '2' }],
+    cases: [
+      { id: '2', caseId: 'CS-2024-PARTLY-1' },
+      { id: '1', caseId: null },
+    ],
     detectedAt: '2024-12-03T10:00:00Z',
     createdAt: '2024-12-03T10:00:00Z',
     updatedAt: '2024-12-03T10:00:00Z',

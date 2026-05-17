@@ -49,7 +49,14 @@ import {
 import { CaseApi } from '@shared/lib/api/caseApi';
 import { IncidentApi } from '@shared/lib/api/incidentApi';
 import { getCaseStatusLabelRu, getIncidentStatusLabelRu } from '@shared/lib/statusLabels';
+import { getWorkflowPriorityLabelRu } from '@shared/lib/domainLabelsRu';
 import { TaskApi } from '@shared/lib/api/taskApi';
+import {
+  collectCaseAssigneeUserIds,
+  extractCaseAssigneeUserId,
+  formatUserBasicInfoDisplayName,
+  getEmbeddedAssigneeDisplayName,
+} from '@shared/lib/userDisplay';
 import type {
   IncidentReportCase,
   IncidentReportItem,
@@ -94,31 +101,9 @@ const formatUnknown = (value: unknown): string => {
   }
 };
 
-const getPriorityLabel = (priority: string): string => {
-  const labels: Record<string, string> = {
-    LOW: 'Низкий',
-    MEDIUM: 'Средний',
-    NORMAL: 'Средний',
-    HIGH: 'Высокий',
-    URGENT: 'Высокий',
-    CRITICAL: 'Высокий',
-  };
-  const normalized = priority.toUpperCase();
-  return labels[normalized] ?? priority;
-};
-
 const getRuleNameLabel = (ruleName: unknown, findingId: string): string => {
   const formatted = formatUnknown(ruleName);
   return formatted === '-' ? findingId : formatted;
-};
-
-const getAssigneeFullName = (assignedUserId: unknown): string => {
-  if (!assignedUserId || typeof assignedUserId !== 'object') return 'Не назначен';
-  const user = assignedUserId as Record<string, unknown>;
-  const firstName = typeof user.firstName === 'string' ? user.firstName.trim() : '';
-  const lastName = typeof user.lastName === 'string' ? user.lastName.trim() : '';
-  const fullName = `${firstName} ${lastName}`.trim();
-  return fullName || 'Не назначен';
 };
 
 const getCommentAuthorName = (comment: IncidentReportCase['comments'][number]): string => {
@@ -185,6 +170,24 @@ export const IncidentsAndCasesPage: FC = observer(() => {
   const [planDecisionComment, setPlanDecisionComment] = useState('');
   const [planDecisionSubmitting, setPlanDecisionSubmitting] = useState(false);
   const [planDecisionError, setPlanDecisionError] = useState<string | null>(null);
+  const [caseAssigneeNamesByUserId, setCaseAssigneeNamesByUserId] = useState<Record<string, string>>({});
+  const [caseAssigneeNamesLoading, setCaseAssigneeNamesLoading] = useState(false);
+
+  const resolveCaseAssigneeDisplayName = useCallback(
+    (assignedUserId: unknown): string => {
+      const embedded = getEmbeddedAssigneeDisplayName(assignedUserId);
+      if (embedded) return embedded;
+
+      const userId = extractCaseAssigneeUserId(assignedUserId);
+      if (!userId) return 'Не назначен';
+
+      const resolved = caseAssigneeNamesByUserId[userId];
+      if (resolved) return resolved;
+      if (caseAssigneeNamesLoading) return '…';
+      return 'Не назначен';
+    },
+    [caseAssigneeNamesByUserId, caseAssigneeNamesLoading]
+  );
 
   const refreshReports = useCallback(async (keepSelectedIncidentId?: string) => {
     try {
@@ -228,6 +231,42 @@ export const IncidentsAndCasesPage: FC = observer(() => {
 
     void loadReports();
   }, [refreshReports]);
+
+  useEffect(() => {
+    const userIds = collectCaseAssigneeUserIds(data?.items ?? []);
+    if (userIds.length === 0) {
+      setCaseAssigneeNamesByUserId({});
+      setCaseAssigneeNamesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setCaseAssigneeNamesLoading(true);
+
+    void (async () => {
+      const entries = await Promise.all(
+        userIds.map(async (userId) => {
+          try {
+            const user = await IncidentApi.getUserBasicInfo(userId);
+            const name = formatUserBasicInfoDisplayName(user);
+            return [userId, name || 'Не назначен'] as const;
+          } catch (userError) {
+            console.error(`Failed to load user basic info ${userId}:`, userError);
+            return [userId, 'Не назначен'] as const;
+          }
+        })
+      );
+
+      if (!cancelled) {
+        setCaseAssigneeNamesByUserId(Object.fromEntries(entries));
+        setCaseAssigneeNamesLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [data]);
 
   const stats = useMemo(() => {
     const items = data?.items ?? [];
@@ -509,7 +548,7 @@ export const IncidentsAndCasesPage: FC = observer(() => {
                       <Typography variant="subtitle2">
                         Обнаружение: {getRuleNameLabel(finding.ruleName, finding.id)}
                       </Typography>
-                      <Chip label={`Приоритет: ${getPriorityLabel(finding.priority)}`} size="small" color="warning" />
+                      <Chip label={`Приоритет: ${getWorkflowPriorityLabelRu(finding.priority)}`} size="small" color="warning" />
                       <Chip label={`Случаев: ${finding.cases.length}`} size="small" variant="outlined" />
                     </Stack>
 
@@ -533,7 +572,7 @@ export const IncidentsAndCasesPage: FC = observer(() => {
                                 <CaseIcon fontSize="small" color="primary" />
                                 <Typography variant="body2" fontWeight={600}>
                                   Ответственный за случай:{' '}
-                                  {getAssigneeFullName(caseItem.assignedUserId ?? finding.assignedUserId)}
+                                  {resolveCaseAssigneeDisplayName(caseItem.assignedUserId)}
                                 </Typography>
                                 <Chip
                                   size="small"
@@ -627,7 +666,7 @@ export const IncidentsAndCasesPage: FC = observer(() => {
                       <Typography variant="subtitle2">
                         Обнаружен риск: {getRuleNameLabel(finding.ruleName, finding.id)}
                       </Typography>
-                      <Chip label={`Приоритет: ${getPriorityLabel(finding.priority || '-')}`} size="small" color="warning" />
+                      <Chip label={`Приоритет: ${getWorkflowPriorityLabelRu(finding.priority || '-')}`} size="small" color="warning" />
                       <Chip label={`Создано случаев: ${finding.cases.length}`} size="small" variant="outlined" />
                     </Stack>
 
@@ -659,7 +698,7 @@ export const IncidentsAndCasesPage: FC = observer(() => {
                           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                             <Typography variant="body2" fontWeight={600}>
                               Ответственный за случай:{' '}
-                              {getAssigneeFullName(caseItem.assignedUserId ?? finding.assignedUserId)}
+                              {resolveCaseAssigneeDisplayName(caseItem.assignedUserId)}
                             </Typography>
                             <Chip
                               label={getCaseStatusLabelRu(caseItem.status)}
@@ -763,7 +802,7 @@ export const IncidentsAndCasesPage: FC = observer(() => {
                                             </Typography>
                                             <Typography component="span" variant="caption" color="text.secondary">
                                               Срок: {formatDateTime(task.dueDate)} | Приоритет:{' '}
-                                              {getPriorityLabel(task.priority)}
+                                              {getWorkflowPriorityLabelRu(task.priority)}
                                             </Typography>
                                           </>
                                         }

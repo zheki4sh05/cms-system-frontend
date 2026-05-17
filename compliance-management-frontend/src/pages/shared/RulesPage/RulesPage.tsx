@@ -31,6 +31,11 @@ import RadarIcon from '@mui/icons-material/Radar';
 import CloseIcon from '@mui/icons-material/Close';
 import type { RulesListItem } from '@shared/types/rulesTypes';
 import { RuleApi } from '@shared/lib/api/ruleApi';
+import {
+  getIncidentCategoryLabelRu,
+  getRuleDisplaySeverityLabelRu,
+  getRuleLifecycleStatusRu,
+} from '@shared/lib/domainLabelsRu';
 
 const formatDate = (value?: string): string => {
   if (!value) {
@@ -127,7 +132,7 @@ export const RulesPage: FC = () => {
                 <TableCell>ID</TableCell>
                 <TableCell>Название</TableCell>
                 <TableCell>Категория</TableCell>
-                <TableCell>Критичность</TableCell>
+                <TableCell>Серьёзность</TableCell>
                 <TableCell>Статус</TableCell>
                 <TableCell>Изменено</TableCell>
                 <TableCell align="right">Действия</TableCell>
@@ -142,9 +147,14 @@ export const RulesPage: FC = () => {
                       {rule.name}
                     </Typography>
                   </TableCell>
-                  <TableCell>{rule.categoryLabel || '-'}</TableCell>
+                  <TableCell>{getIncidentCategoryLabelRu(rule.categoryLabel)}</TableCell>
                   <TableCell>
-                    <Chip label={rule.priority} size="small" color="info" variant="outlined" />
+                    <Chip
+                      label={getRuleDisplaySeverityLabelRu(rule.priority, rule.severity)}
+                      size="small"
+                      color="info"
+                      variant="outlined"
+                    />
                   </TableCell>
                   <TableCell>
                     <Chip
@@ -200,8 +210,10 @@ export const RulesPage: FC = () => {
                     <Typography variant="subtitle2">Основная информация</Typography>
                   </Stack>
                   <Typography variant="body2">ID: {selectedRule.id}</Typography>
-                  <Typography variant="body2">Категория: {selectedRule.categoryLabel || '-'}</Typography>
-                  <Typography variant="body2">Приоритет: {selectedRule.priority}</Typography>
+                  <Typography variant="body2">Категория: {getIncidentCategoryLabelRu(selectedRule.categoryLabel)}</Typography>
+                  <Typography variant="body2">
+                    Серьёзность: {getRuleDisplaySeverityLabelRu(selectedRule.priority, selectedRule.severity)}
+                  </Typography>
                   <Typography variant="body2">
                     Статус: {selectedRule.enabled ? 'Активно' : 'Отключено'}
                   </Typography>
@@ -234,7 +246,7 @@ export const RulesPage: FC = () => {
                   <Typography variant="body2">Risk Object ID: {selectedRule.riskObjectId}</Typography>
                   <Typography variant="body2">Код: {selectedRule.riskObject?.code || '-'}</Typography>
                   <Typography variant="body2">Название: {selectedRule.riskObject?.name || '-'}</Typography>
-                  <Typography variant="body2">Статус: {selectedRule.riskObject?.status || '-'}</Typography>
+                  <Typography variant="body2">Статус: {getRuleLifecycleStatusRu(selectedRule.riskObject?.status)}</Typography>
                   <Typography variant="body2">
                     Обновлено: {formatDate(selectedRule.riskObject?.updatedAt)}
                   </Typography>

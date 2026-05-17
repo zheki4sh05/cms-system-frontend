@@ -1,5 +1,5 @@
 
-import { type FC, useState, type MouseEvent, useEffect } from 'react';
+import { type FC, useState, type MouseEvent } from 'react';
 import { observer } from 'mobx-react-lite';
 import {
   AppBar,
@@ -121,11 +121,6 @@ export const Header: FC = observer(() => {
         return '';
     }
   };
-  useEffect(()=>{
-      if(!authStore.isFirstLogin){
-          handleOpenProfile()
-      }
-  },[])
 
   return (
     <>

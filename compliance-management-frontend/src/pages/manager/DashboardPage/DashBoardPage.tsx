@@ -38,6 +38,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { DashboardApi } from '@shared/lib/api/dashboardApi';
 import type { DashboardStats, RecentActivity, UpcomingTask } from '@shared/types/dashBoardTypes';
+import { getSeverityLabelRu, getWorkflowPriorityLabelRu } from '@shared/lib/domainLabelsRu';
 
 export const ManagerDashboardPage: FC = observer(() => {
   const navigate = useNavigate();
@@ -331,7 +332,7 @@ export const ManagerDashboardPage: FC = observer(() => {
                               </Typography>
                               {activity.severity && (
                                 <Chip 
-                                  label={activity.severity} 
+                                  label={getSeverityLabelRu(activity.severity)} 
                                   size="small" 
                                   color={getIncidentSeverityColor(activity.severity)}
                                 />
@@ -401,7 +402,7 @@ export const ManagerDashboardPage: FC = observer(() => {
                               </Typography>
                               <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
                                 <Chip 
-                                  label={task.priority} 
+                                  label={getWorkflowPriorityLabelRu(task.priority)} 
                                   size="small" 
                                   color={getTaskPriorityColor(task.priority)}
                                   sx={{ height: 20, fontSize: '0.7rem' }}

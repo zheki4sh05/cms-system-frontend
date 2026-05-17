@@ -44,7 +44,6 @@ import {
   Search as SearchIcon,
   Add as AddIcon,
   CheckCircle as CheckIcon,
-  Schedule as ScheduleIcon,
   Error as ErrorIcon,
   PlayArrow as StartIcon,
   AttachFile as AttachIcon,
@@ -59,11 +58,13 @@ import {
 } from '@mui/icons-material';
 import { TaskApi } from '@shared/lib/api/taskApi';
 import { getCaseStatusLabelRu, getIncidentStatusLabelRu } from '@shared/lib/statusLabels';
+import { getSeverityLabelRu, getTaskStatusLabelRu, getWorkflowPriorityLabelRu } from '@shared/lib/domainLabelsRu';
 import { CaseApi } from '@shared/lib/api/caseApi';
 import { IncidentApi } from '@shared/lib/api/incidentApi';
 import {
   ActionPlanDetailsSection,
   ActionPlanRiskObjectCaption,
+  ActionPlanTasksAccordion,
 } from '@shared/lib/actionPlanView';
 import { getFileKindShortLabel } from '@shared/lib/fileDisplay';
 import type {
@@ -143,6 +144,12 @@ export const ManagerTasksPage: FC = observer(() => {
     new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
   );
   const [viewAddTaskSaving, setViewAddTaskSaving] = useState(false);
+  const [taskDeleteDialogOpen, setTaskDeleteDialogOpen] = useState(false);
+  const [taskDeleteTarget, setTaskDeleteTarget] = useState<{
+    planId: string;
+    taskId: string;
+  } | null>(null);
+  const [taskDeleteSaving, setTaskDeleteSaving] = useState(false);
   
   // Создание плана
   const [selectedCaseForPlan, setSelectedCaseForPlan] = useState<string | null>(null);
@@ -174,9 +181,12 @@ export const ManagerTasksPage: FC = observer(() => {
     }
   }, [location.pathname, location.state]);
 
-  const loadData = async () => {
+  const loadData = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       const [tasksResult, plansResult, statsResult] = await Promise.allSettled([
         TaskApi.getMyTasks(),
         TaskApi.getActionPlans(),
@@ -204,7 +214,9 @@ export const ManagerTasksPage: FC = observer(() => {
         setStatistics(null);
       }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -293,6 +305,40 @@ export const ManagerTasksPage: FC = observer(() => {
     setSelectedPlan(plan);
     resetViewNewTaskForm();
     setViewPlanDialogOpen(true);
+  };
+
+  const handleOpenDeletePlanTaskDialog = (planId: string, taskId: string) => {
+    setTaskDeleteTarget({ planId, taskId });
+    setTaskDeleteDialogOpen(true);
+  };
+
+  const handleCloseDeletePlanTaskDialog = () => {
+    if (taskDeleteSaving) return;
+    setTaskDeleteDialogOpen(false);
+    setTaskDeleteTarget(null);
+  };
+
+  const handleConfirmDeletePlanTask = async () => {
+    if (!taskDeleteTarget || taskDeleteSaving) return;
+
+    const { planId, taskId } = taskDeleteTarget;
+    setTaskDeleteSaving(true);
+    try {
+      await TaskApi.deleteActionPlanTask(planId, taskId);
+
+      const updated = await TaskApi.getActionPlan(planId);
+
+      setTaskDeleteDialogOpen(false);
+      setTaskDeleteTarget(null);
+      setSelectedPlan(updated);
+      setViewPlanDialogOpen(true);
+      setActionPlans((prev) => prev.map((p) => (p.id === planId ? updated : p)));
+      void loadData({ silent: true });
+    } catch (error) {
+      console.error('Failed to delete action plan task:', error);
+    } finally {
+      setTaskDeleteSaving(false);
+    }
   };
 
   const handleAppendTaskToPlan = async () => {
@@ -685,15 +731,6 @@ export const ManagerTasksPage: FC = observer(() => {
     }
   };
 
-  const getTaskPriorityLabel = (priority: TaskPriority) => {
-    switch (priority) {
-      case 'URGENT': return 'Высокий';
-      case 'HIGH': return 'Высокий';
-      case 'NORMAL': return 'Средний';
-      case 'LOW': return 'Низкий';
-    }
-  };
-
   const getTaskStatusColor = (status: TaskStatus) => {
     switch (status) {
       case 'TODO': return 'default';
@@ -703,17 +740,6 @@ export const ManagerTasksPage: FC = observer(() => {
     }
   };
 
-  const getTaskStatusLabel = (status: TaskStatus) => {
-    const labels = {
-      TODO: 'К выполнению',
-      IN_PROGRESS: 'В работе',
-      DONE: 'Выполнено',
-      BLOCKED: 'Заблокировано',
-    };
-    return labels[status];
-  };
-
-  /** Статус случая из GET /api/action-plans → поле caseStatus (отдельного статуса плана нет) */
   const getCaseWorkflowStatusLabel = (caseStatus: string) => {
     return getCaseStatusLabelRu(caseStatus.trim().toUpperCase());
   };
@@ -913,7 +939,7 @@ export const ManagerTasksPage: FC = observer(() => {
                               {task.title}
                             </Typography>
                             <Chip
-                              label={getTaskPriorityLabel(task.priority)}
+                              label={getWorkflowPriorityLabelRu(task.priority)}
                               color={getTaskPriorityColor(task.priority)}
                               size="small"
                             />
@@ -978,7 +1004,7 @@ export const ManagerTasksPage: FC = observer(() => {
                               {task.title}
                             </Typography>
                             <Chip
-                              label={getTaskPriorityLabel(task.priority)}
+                              label={getWorkflowPriorityLabelRu(task.priority)}
                               color={getTaskPriorityColor(task.priority)}
                               size="small"
                             />
@@ -1185,6 +1211,33 @@ export const ManagerTasksPage: FC = observer(() => {
           </TabPanel>
         </Paper>
 
+        <Dialog
+          open={taskDeleteDialogOpen}
+          onClose={handleCloseDeletePlanTaskDialog}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle>Удаление задачи</DialogTitle>
+          <DialogContent>
+            <Typography variant="body1">
+              Связанные доказательства задачи также удаляются. Вы уверены что хотите удалить задачу?
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={handleCloseDeletePlanTaskDialog} disabled={taskDeleteSaving}>
+              Отмена
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={() => void handleConfirmDeletePlanTask()}
+              disabled={taskDeleteSaving}
+            >
+              {taskDeleteSaving ? 'Удаление…' : 'Удалить'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         {/* Диалог создания плана */}
         <Dialog
           open={createPlanDialogOpen}
@@ -1281,8 +1334,9 @@ export const ManagerTasksPage: FC = observer(() => {
                         onChange={(e) => handleUpdatePlanTask(index, 'priority', e.target.value)}
                       >
                         <MenuItem value="LOW">Низкий</MenuItem>
-                        <MenuItem value="NORMAL">Средний</MenuItem>
+                        <MenuItem value="NORMAL">Обычный</MenuItem>
                         <MenuItem value="HIGH">Высокий</MenuItem>
+                        <MenuItem value="URGENT">Срочный</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -1371,27 +1425,12 @@ export const ManagerTasksPage: FC = observer(() => {
                 <Typography variant="subtitle1" gutterBottom>
                   Задачи плана
                 </Typography>
-                <List>
-                  {selectedPlan.tasks.map((task, taskIndex) => (
-                    <ListItem
-                      key={task.id || `plan-task-${taskIndex}`}
-                      sx={{ border: 1, borderColor: 'divider', borderRadius: 1, mb: 1 }}
-                    >
-                      <ListItemIcon>
-                        {task.status === 'DONE' ? <CheckIcon color="success" /> : <ScheduleIcon />}
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={task.title}
-                        secondary={
-                          <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-                            <Chip label={getTaskStatusLabel(task.status)} size="small" color={getTaskStatusColor(task.status)} />
-                            <Chip label={getTaskPriorityLabel(task.priority)} size="small" color={getTaskPriorityColor(task.priority)} />
-                          </Box>
-                        }
-                      />
-                    </ListItem>
-                  ))}
-                </List>
+                <ActionPlanTasksAccordion
+                  planId={selectedPlan.id}
+                  tasks={selectedPlan.tasks}
+                  onDeleteTask={handleOpenDeletePlanTaskDialog}
+                  deleteDisabled={viewAddTaskSaving || taskDeleteSaving}
+                />
 
                 <Divider sx={{ my: 3 }} />
 
@@ -1436,8 +1475,9 @@ export const ManagerTasksPage: FC = observer(() => {
                         }
                       >
                         <MenuItem value="LOW">Низкий</MenuItem>
-                        <MenuItem value="NORMAL">Средний</MenuItem>
+                        <MenuItem value="NORMAL">Обычный</MenuItem>
                         <MenuItem value="HIGH">Высокий</MenuItem>
+                        <MenuItem value="URGENT">Срочный</MenuItem>
                       </Select>
                     </FormControl>
                   </Grid>
@@ -1561,12 +1601,12 @@ export const ManagerTasksPage: FC = observer(() => {
                   <Typography variant="h6">{selectedTask.title}</Typography>
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <Chip
-                      label={getTaskPriorityLabel(selectedTask.priority)}
+                      label={getWorkflowPriorityLabelRu(selectedTask.priority)}
                       color={getTaskPriorityColor(selectedTask.priority)}
                       size="small"
                     />
                     <Chip
-                      label={getTaskStatusLabel(selectedTask.status)}
+                      label={getTaskStatusLabelRu(selectedTask.status)}
                       color={getTaskStatusColor(selectedTask.status)}
                       size="small"
                     />
@@ -1986,7 +2026,7 @@ export const ManagerTasksPage: FC = observer(() => {
                     <Typography variant="caption" color="text.secondary">ID: {detailIncident.id}</Typography>
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Chip label={detailIncident.severity} color={getIncidentSeverityColor(detailIncident.severity)} size="small" />
+                    <Chip label={getSeverityLabelRu(detailIncident.severity)} color={getIncidentSeverityColor(detailIncident.severity)} size="small" />
                     <Chip label={getIncidentStatusLabelRu(detailIncident.status)} color={getCaseWorkflowStatusColor(detailIncident.status)} size="small" />
                   </Box>
                 </Box>

@@ -54,6 +54,18 @@ export class IncidentApi {
     return statusMap[normalized] || 'NEW';
   }
 
+  /** null, пустая строка или {} в API означают «кейс ещё не создан» */
+  private static normalizeEmployeeCaseId(value: unknown): string | null {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    if (typeof value === 'object' && Object.keys(value as object).length === 0) return null;
+    return null;
+  }
+
   private static normalizeSeverity(severity: unknown): Incident['severity'] {
     if (typeof severity !== 'string') return 'LOW';
     const normalized = severity.toUpperCase();
@@ -100,6 +112,27 @@ export class IncidentApi {
           .filter((e): e is { userId: string } => e !== null)
       : undefined;
 
+    const rawCases = (incident as Partial<Incident> & { cases?: unknown }).cases;
+    const cases: Incident['cases'] = Array.isArray(rawCases)
+      ? rawCases
+          .map((item) => {
+            if (!item || typeof item !== 'object') return null;
+            const rec = item as Record<string, unknown>;
+            const id =
+              typeof rec.id === 'string'
+                ? rec.id
+                : typeof rec.id === 'number' || typeof rec.id === 'boolean'
+                  ? String(rec.id)
+                  : '';
+            if (!id) return null;
+            return {
+              id,
+              caseId: this.normalizeEmployeeCaseId(rec.caseId),
+            };
+          })
+          .filter((c): c is NonNullable<Incident['cases']>[number] => c !== null)
+      : undefined;
+
     return {
       id: incident.id || '',
       riskObjectId: incident.riskObjectId,
@@ -118,6 +151,7 @@ export class IncidentApi {
       assignedTo: incident.assignedTo || '',
       assignedToName: incident.assignedToName || '',
       employees: employees?.length ? employees : undefined,
+      cases: cases?.length ? cases : undefined,
       detectedAt,
       createdAt: incident.createdAt || detectedAt,
       updatedAt: incident.updatedAt || detectedAt,
@@ -302,7 +336,7 @@ export class IncidentApi {
    * Получить базовую информацию о пользователе из user-service
    */
   static async getUserBasicInfo(userId: string): Promise<UserBasicInfo> {
-    const response = await apiClient.get<UserBasicInfo>(`http://localhost:8081/api/users/${userId}/basic-info`);
+    const response = await apiClient.get<UserBasicInfo>(`/api/users/${userId}/basic-info`);
     return response.data;
   }
 

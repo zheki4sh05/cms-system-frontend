@@ -4,7 +4,6 @@ import {
   ReportProblemOutlined,
   FolderOpenOutlined,
   AssignmentOutlined,
-  AnalyticsOutlined,
   RuleOutlined,
   DescriptionOutlined,
   BusinessOutlined,
@@ -75,13 +74,6 @@ export const navigationItems: NavigationItem[] = [
     label: 'Инциденты и случаи',
     path: '/supervisor/incidents-cases',
     icon: ReportProblemOutlined,
-    roles: [UserRoleValues.SUPERVISOR],
-  },
-  {
-    id: 'supervisor-analytics',
-    label: 'Аналитика',
-    path: '/supervisor/analytics',
-    icon: AnalyticsOutlined,
     roles: [UserRoleValues.SUPERVISOR],
   },
   {

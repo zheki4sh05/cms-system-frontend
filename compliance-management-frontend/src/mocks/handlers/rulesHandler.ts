@@ -825,6 +825,7 @@ export const rulesHandlers = [
         categoryId: rule.category,
         categoryLabel: rule.category,
         priority: String(rule.priority),
+        severity: rule.severity,
         enabled: rule.isActive,
         riskObjectId: `risk-${rule.id}`,
         riskObject: {

@@ -72,6 +72,11 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { IncidentApi } from '@shared/lib/api/incidentApi';
 import { getIncidentStatusLabelRu } from '@shared/lib/statusLabels';
+import {
+  getIncidentCategoryLabelRu,
+  getManagerWorkloadStatusRu,
+  getSeverityLabelRu,
+} from '@shared/lib/domainLabelsRu';
 import type {
   Incident,
   IncidentStatus,
@@ -268,15 +273,7 @@ export const SupervisorIncidentsPage: FC = observer(() => {
   };
 
   const getCategoryLabel = (category: IncidentCategory) => {
-    const labels = {
-      FINANCIAL: 'Финансы',
-      VENDOR: 'Контрагенты',
-      COMPLIANCE: 'Комплаенс',
-      LOGISTICS: 'Логистика',
-      DATA_QUALITY: 'Качество данных',
-      ETHICS: 'Этика',
-    };
-    return labels[category];
+    return getIncidentCategoryLabelRu(category);
   };
 
   const getWorkloadStatusColor = (status: string) => {
@@ -289,12 +286,7 @@ export const SupervisorIncidentsPage: FC = observer(() => {
   };
 
   const getWorkloadStatusLabel = (status: 'AVAILABLE' | 'BUSY' | 'OVERLOADED') => {
-    const labels = {
-      AVAILABLE: 'Доступен',
-      BUSY: 'Занят',
-      OVERLOADED: 'Перегружен',
-    };
-    return labels[status] || status;
+    return getManagerWorkloadStatusRu(status);
   };
 
   const filteredIncidents = incidents.filter(i => {
@@ -685,7 +677,7 @@ export const SupervisorIncidentsPage: FC = observer(() => {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={incident.severity}
+                          label={getSeverityLabelRu(incident.severity)}
                           color={getSeverityColor(incident.severity)}
                           size="small"
                         />
@@ -765,7 +757,7 @@ export const SupervisorIncidentsPage: FC = observer(() => {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={incident.severity}
+                          label={getSeverityLabelRu(incident.severity)}
                           color={getSeverityColor(incident.severity)}
                           size="small"
                         />
@@ -826,7 +818,7 @@ export const SupervisorIncidentsPage: FC = observer(() => {
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <Chip
-                      label={selectedIncident.severity}
+                      label={getSeverityLabelRu(selectedIncident.severity)}
                       color={getSeverityColor(selectedIncident.severity)}
                       size="small"
                     />
@@ -1090,7 +1082,7 @@ export const SupervisorIncidentsPage: FC = observer(() => {
                   </Typography>
                   <br />
                   <Typography variant="caption">
-                    <strong>Критичность:</strong> {selectedIncident.severity}
+                    <strong>Критичность:</strong> {getSeverityLabelRu(selectedIncident.severity)}
                   </Typography>
                 </Alert>
 

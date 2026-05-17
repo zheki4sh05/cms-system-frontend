@@ -60,6 +60,11 @@ import { useNavigate } from 'react-router-dom';
 import { CaseApi } from '@shared/lib/api/caseApi';
 import { getFileKindShortLabel } from '@shared/lib/fileDisplay';
 import { getCaseStatusLabelRu } from '@shared/lib/statusLabels';
+import {
+  getSeverityLabelFeminineRu,
+  getSeverityLabelRu,
+  getWorkflowPriorityLabelRu,
+} from '@shared/lib/domainLabelsRu';
 import { TaskApi } from '@shared/lib/api/taskApi';
 import { RuleApi } from '@shared/lib/api/ruleApi';
 import { IncidentApi } from '@shared/lib/api/incidentApi';
@@ -68,7 +73,6 @@ import type {
   Case,
   CaseStatus,
   CaseSeverity,
-  CasePriority,
   CaseComment,
   CaseAttachment,
   ManagerCaseStatistics,
@@ -401,16 +405,6 @@ export const ManagerCasesPage: FC = observer(() => {
     return getCaseStatusLabelRu(status);
   };
 
-  const getPriorityLabel = (priority: CasePriority): string => {
-    const labels: Record<CasePriority, string> = {
-      LOW: 'Низкий',
-      NORMAL: 'Средний',
-      HIGH: 'Высокий',
-      URGENT: 'Высокий',
-    };
-    return labels[priority];
-  };
-
   const stringifyValue = (value: unknown): string => {
     if (typeof value === 'string') return value;
     if (typeof value === 'number' || typeof value === 'boolean') return String(value);
@@ -422,17 +416,6 @@ export const ManagerCasesPage: FC = observer(() => {
       }
     }
     return '-';
-  };
-
-  const getRiskSeverityLabel = (severity?: string): string => {
-    if (!severity) return '-';
-    const labels: Record<string, string> = {
-      LOW: 'Низкая',
-      MEDIUM: 'Средняя',
-      HIGH: 'Высокая',
-      CRITICAL: 'Критичная',
-    };
-    return labels[severity.toUpperCase()] || severity;
   };
 
   const isInvestigationEditable =
@@ -604,7 +587,7 @@ export const ManagerCasesPage: FC = observer(() => {
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={getPriorityLabel(caseItem.priority)}
+                      label={getWorkflowPriorityLabelRu(caseItem.priority)}
                       variant="outlined"
                       size="small"
                     />
@@ -651,7 +634,7 @@ export const ManagerCasesPage: FC = observer(() => {
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <Chip
-                      label={selectedCase.severity}
+                      label={getSeverityLabelRu(selectedCase.severity)}
                       color={getSeverityColor(selectedCase.severity)}
                       size="small"
                     />
@@ -791,7 +774,7 @@ export const ManagerCasesPage: FC = observer(() => {
                               <Grid size={{ xs: 12 }}>
                                 <Typography variant="caption" color="text.secondary">Критичность риска</Typography>
                                 <Typography variant="body2">
-                                  {getRiskSeverityLabel(
+                                  {getSeverityLabelFeminineRu(
                                     stringifyValue(
                                       (caseViewData.details as Record<string, unknown> | undefined)?.severity
                                     )

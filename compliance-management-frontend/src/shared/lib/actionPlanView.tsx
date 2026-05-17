@@ -1,4 +1,27 @@
-import { Box, Grid, Paper, Stack, Typography } from '@mui/material';
+import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Box,
+  Chip,
+  Grid,
+  IconButton,
+  Paper,
+  Stack,
+  Tooltip,
+  Typography,
+} from '@mui/material';
+import {
+  CheckCircle as CheckIcon,
+  DeleteOutline as DeleteOutlineIcon,
+  ExpandMore as ExpandMoreIcon,
+  Schedule as ScheduleIcon,
+} from '@mui/icons-material';
+import {
+  getTaskStatusLabelRu,
+  getWorkflowPriorityLabelRu,
+} from '@shared/lib/domainLabelsRu';
+import type { Task, TaskPriority, TaskStatus } from '@shared/types/taskTypes';
 
 function stringifyDetailValue(value: unknown): string {
   if (value === null || value === undefined) return '—';
@@ -154,6 +177,174 @@ export function ActionPlanDetailsSection({ details }: ActionPlanDetailsSectionPr
         </Grid>
       </Paper>
     </Box>
+  );
+}
+
+function formatTaskDateTime(value?: string): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('ru-RU');
+}
+
+function TaskDetailField({ label, value }: { label: string; value?: string | null }) {
+  if (!value?.trim()) return null;
+  return (
+    <Box sx={{ mb: 1.5 }}>
+      <Typography variant="caption" color="text.secondary" display="block">
+        {label}
+      </Typography>
+      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+        {value}
+      </Typography>
+    </Box>
+  );
+}
+
+function taskStatusChipColor(status: TaskStatus): 'default' | 'primary' | 'success' | 'error' {
+  switch (status) {
+    case 'IN_PROGRESS':
+      return 'primary';
+    case 'DONE':
+      return 'success';
+    case 'BLOCKED':
+      return 'error';
+    default:
+      return 'default';
+  }
+}
+
+function taskPriorityChipColor(priority: TaskPriority): 'default' | 'info' | 'warning' | 'success' {
+  switch (priority) {
+    case 'URGENT':
+    case 'HIGH':
+      return 'warning';
+    case 'NORMAL':
+      return 'info';
+    case 'LOW':
+      return 'success';
+    default:
+      return 'default';
+  }
+}
+
+export interface ActionPlanTasksAccordionProps {
+  planId: string;
+  tasks: Task[];
+  onDeleteTask?: (planId: string, taskId: string) => void;
+  deleteDisabled?: boolean;
+}
+
+/** Список задач плана с раскрывающимися деталями из GET /action-plans */
+export function ActionPlanTasksAccordion({
+  planId,
+  tasks,
+  onDeleteTask,
+  deleteDisabled = false,
+}: ActionPlanTasksAccordionProps) {
+  if (tasks.length === 0) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        Задачи не добавлены
+      </Typography>
+    );
+  }
+
+  return (
+    <Stack spacing={1}>
+      {tasks.map((task, taskIndex) => (
+        <Accordion
+          key={task.id || `plan-task-${taskIndex}`}
+          disableGutters
+          sx={{
+            border: 1,
+            borderColor: 'divider',
+            borderRadius: 1,
+            '&:before': { display: 'none' },
+            overflow: 'hidden',
+          }}
+        >
+          <AccordionSummary
+            expandIcon={<ExpandMoreIcon />}
+            sx={{
+              '& .MuiAccordionSummary-content': {
+                alignItems: 'center',
+                gap: 1,
+                my: 0.5,
+              },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1, minWidth: 0 }}>
+              {task.status === 'DONE' ? (
+                <CheckIcon color="success" fontSize="small" />
+              ) : (
+                <ScheduleIcon color="action" fontSize="small" />
+              )}
+              <Typography variant="subtitle2" sx={{ flex: 1, minWidth: 0 }} noWrap>
+                {task.title || `Задача #${taskIndex + 1}`}
+              </Typography>
+              <Chip
+                label={getTaskStatusLabelRu(task.status)}
+                size="small"
+                color={taskStatusChipColor(task.status)}
+              />
+              <Chip
+                label={getWorkflowPriorityLabelRu(task.priority)}
+                size="small"
+                color={taskPriorityChipColor(task.priority)}
+              />
+            </Box>
+            {task.id && onDeleteTask ? (
+              <Tooltip title="Удалить задачу">
+                <span>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    aria-label="Удалить задачу"
+                    disabled={deleteDisabled}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDeleteTask(planId, task.id);
+                    }}
+                  >
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            ) : null}
+          </AccordionSummary>
+          <AccordionDetails sx={{ pt: 0, borderTop: 1, borderColor: 'divider' }}>
+            <TaskDetailField label="Описание" value={task.description} />
+            <TaskDetailField label="Рекомендация" value={task.recommendation} />
+            <TaskDetailField label="Исполнитель" value={task.assigneeName} />
+            <TaskDetailField label="Срок выполнения" value={formatTaskDateTime(task.dueDate)} />
+            {task.completedAt ? (
+              <TaskDetailField label="Завершена" value={formatTaskDateTime(task.completedAt)} />
+            ) : null}
+            <TaskDetailField label="Доказательство выполнения" value={task.evidenceDescription} />
+            {typeof task.comment === 'string' && task.comment.trim() ? (
+              <TaskDetailField label="Комментарий" value={task.comment} />
+            ) : null}
+            {task.details &&
+              Object.entries(task.details)
+                .filter(
+                  ([key]) =>
+                    !['title', 'severity', 'description', 'recommendation'].includes(key)
+                )
+                .map(([key, value]) => (
+                  <Box key={key} sx={{ mb: 1.5 }}>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      {humanizeDetailKey(key)}
+                    </Typography>
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                      {stringifyDetailValue(value)}
+                    </Typography>
+                  </Box>
+                ))}
+          </AccordionDetails>
+        </Accordion>
+      ))}
+    </Stack>
   );
 }
 

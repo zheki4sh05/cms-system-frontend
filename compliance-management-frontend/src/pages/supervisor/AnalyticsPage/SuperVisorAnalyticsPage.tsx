@@ -66,6 +66,7 @@ import type {
   VendorRiskAnalytics,
   ReportExportOptions,
 } from '@shared/types/analyticTypes';
+import { getSeverityLabelRu } from '@shared/lib/domainLabelsRu';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -1056,7 +1057,7 @@ export const SupervisorAnalyticsPage: FC = observer(() => {
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <Typography variant="body2">{area.area}</Typography>
                                 <Chip
-                                  label={area.severity}
+                                  label={getSeverityLabelRu(area.severity)}
                                   size="small"
                                   color={getRiskColor(area.severity)}
                                 />

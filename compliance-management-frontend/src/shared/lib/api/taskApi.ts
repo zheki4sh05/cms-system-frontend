@@ -130,16 +130,29 @@ function coerceTask(raw: unknown): Task {
   }
 
   const o = raw as Record<string, unknown>;
+  const details = normalizePlanDetails(o.details);
   const dueDate =
     typeof o.dueDate === 'string' && o.dueDate.length > 0
       ? o.dueDate
       : new Date().toISOString();
   const days = dueInDays(dueDate);
 
+  const descriptionFromDetails =
+    details && typeof details.description === 'string' ? details.description.trim() : '';
+  const descriptionRaw = planFieldToString(o.description).trim() || descriptionFromDetails;
+
+  const recommendationFromDetails =
+    details && typeof details.recommendation === 'string' ? details.recommendation.trim() : '';
+  const recommendationRaw =
+    (typeof o.recommendation === 'string' ? o.recommendation.trim() : '') ||
+    recommendationFromDetails;
+
   return {
     id: typeof o.id === 'string' ? o.id : '',
     title: planFieldToString(o.title),
-    description: planFieldToString(o.description),
+    description: descriptionRaw,
+    ...(recommendationRaw ? { recommendation: recommendationRaw } : {}),
+    ...(details ? { details } : {}),
     status: normalizeTaskStatus(o.status),
     priority: normalizeTaskPriority(o.priority),
     actionPlanId: coerceIdentifier(o.actionPlanId),
@@ -333,6 +346,13 @@ export class TaskApi {
    */
   static async deleteActionPlan(planId: string): Promise<void> {
     await apiClient.delete(`/api/action-plans/${planId}`);
+  }
+
+  /**
+   * Удалить задачу из плана действий
+   */
+  static async deleteActionPlanTask(actionPlanId: string, taskId: string): Promise<void> {
+    await apiClient.delete(`/api/action-plans/${actionPlanId}/tasks/${taskId}`);
   }
 
   /**

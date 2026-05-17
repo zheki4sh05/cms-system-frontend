@@ -57,6 +57,7 @@ import type {
   IncidentWorkflowStatusOverview,
 } from '@shared/types/incidentTypes';
 import type { PendingVerificationItem, RuleEffectiveness, TeamKPI } from '@shared/types/supervisorTypes';
+import { getIncidentsOverviewScopeShortRu } from '@shared/lib/domainLabelsRu';
 
 /** Подсказки к полям GET /api/incidents/my/stats для топ-менеджера (EXECUTIVE) */
 const INCIDENT_COMPANY_STATS_HINT = {
@@ -690,7 +691,7 @@ export const ExecutiveDashboardPage: FC = observer(() => {
                 </Typography>
               </Box>
               <Tooltip title={OV_HINT.scope}>
-                <Chip label={incidentsOverview.scope} size="small" color="primary" variant="outlined" />
+                <Chip label={getIncidentsOverviewScopeShortRu(incidentsOverview.scope)} size="small" color="primary" variant="outlined" />
               </Tooltip>
             </Box>
 

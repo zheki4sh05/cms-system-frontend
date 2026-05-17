@@ -14,7 +14,6 @@ import { ManagerTasksPage } from '@pages/manager/TasksPage/ManagerTasksPage';
 
 // Supervisor pages
 import { SupervisorDashboardPage } from '@pages/supervisor/DashboardPage/DashBoardPage';
-import { SupervisorAnalyticsPage } from '@pages/supervisor/AnalyticsPage/SuperVisorAnalyticsPage';
 
 // Executive pages
 import { ExecutiveDashboardPage } from '@pages/executive/DashboardPage/ExecutiveDashboardPage';
@@ -80,7 +79,7 @@ export const RouterProvider: FC = observer(() => {
                   <Route path="incidents-cases" element={<IncidentsAndCasesPage />} />
                   <Route path="cases" element={<Navigate to="../incidents-cases" replace />} />
                   <Route path="incidents" element={<Navigate to="../incidents-cases" replace />} />
-                  <Route path="analytics" element={<SupervisorAnalyticsPage />} />
+                  <Route path="analytics" element={<Navigate to="../dashboard" replace />} />
                   <Route path="archive" element={<ArchivePage />} />
                   <Route path="rules" element={<SupervisorRulesPage />} />
                   <Route path="help" element={<SupervisorHelpPage />} />

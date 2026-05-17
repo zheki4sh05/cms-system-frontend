@@ -14,13 +14,13 @@ export const RegisterPage: FC = () => {
     if (authStore.isAuthenticated && authStore.userRole) {
       switch (authStore.userRole) {
         case UserRoleValues.MANAGER:
-          navigate('/manager/help', { replace: true });
+          navigate('/manager/incidents', { replace: true });
           break;
         case UserRoleValues.SUPERVISOR:
-          navigate('/supervisor/help', { replace: true });
+          navigate('/supervisor/dashboard', { replace: true });
           break;
         case UserRoleValues.EXECUTIVE:
-          navigate('/executive/help', { replace: true });
+          navigate('/executive/dashboard', { replace: true });
           break;
       }
     }

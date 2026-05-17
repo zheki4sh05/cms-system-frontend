@@ -20,7 +20,8 @@ let mockTasks: Task[] = [
   {
     id: 'TASK-001',
     title: 'Пересмотреть регламент согласования бюджета',
-    description: 'Необходимо добавить этап контроля изменения цен после согласования бюджета',
+    description: 'Сумма договора превышена на 105000. Лимит: 10000',
+    recommendation: 'Требуется дополнительное согласование с руководителем',
     status: 'TODO' as TaskStatus,
     priority: 'HIGH' as TaskPriority,
     actionPlanId: 'AP-2024-001',
@@ -493,6 +494,44 @@ http.patch(`${API_BASE_URL}/tasks/:taskId`, async ({ request, params }) => {
     mockTasks = mockTasks.filter((t) => t.actionPlanId !== planId);
     return new HttpResponse(null, { status: 204 });
   }),
+
+  http.delete(
+    `${API_BASE_URL.replace('/api/v1', '')}/api/action-plans/:planId/tasks/:taskId`,
+    async ({ params }) => {
+      await delay(300);
+      const { planId, taskId } = params;
+      const planIndex = mockActionPlans.findIndex((p) => p.id === planId);
+      if (planIndex === -1) {
+        return HttpResponse.json(
+          { message: 'План не найден', code: 'PLAN_NOT_FOUND' },
+          { status: 404 }
+        );
+      }
+
+      const taskExists = mockTasks.some((t) => t.id === taskId && t.actionPlanId === planId);
+      if (!taskExists) {
+        return HttpResponse.json(
+          { message: 'Задача не найдена', code: 'TASK_NOT_FOUND' },
+          { status: 404 }
+        );
+      }
+
+      mockTasks = mockTasks.filter((t) => t.id !== taskId);
+      const plan = mockActionPlans[planIndex];
+      const planTasks = mockTasks.filter((t) => t.actionPlanId === planId);
+      const completedTasks = planTasks.filter((t) => t.status === 'DONE').length;
+      mockActionPlans[planIndex] = {
+        ...plan,
+        tasks: planTasks,
+        totalTasks: planTasks.length,
+        completedTasks,
+        progressPercentage:
+          planTasks.length > 0 ? Math.round((completedTasks / planTasks.length) * 100) : 0,
+      };
+
+      return new HttpResponse(null, { status: 204 });
+    }
+  ),
 
   http.patch(`${API_BASE_URL.replace('/api/v1', '')}/api/action-plans/:planId`, async ({ params, request }) => {
     await delay(350);

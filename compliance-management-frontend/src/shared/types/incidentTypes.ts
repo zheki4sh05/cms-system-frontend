@@ -109,7 +109,9 @@ export interface Incident {
   assignedToName: string;
   /** Участники (userId), приходит с GET /api/incidents/my */
   employees?: Array<{ userId: string }>;
-  
+  /** Связь исполнителя с кейсом (MANAGER, GET /api/incidents/my) */
+  cases?: IncidentEmployeeCase[];
+
   // Временные метки
   detectedAt: string;
   createdAt: string;
@@ -134,6 +136,14 @@ export interface Incident {
   // Резолюция
   resolutionNotes?: string;
   falsePositiveReason?: string;
+}
+
+/** Запись cases[] в ответе GET /api/incidents/my для MANAGER */
+export interface IncidentEmployeeCase {
+  /** userId исполнителя */
+  id: string;
+  /** id кейса после «взять в работу»; null или {} — работа ещё не начата */
+  caseId: string | null;
 }
 
 /** GET /api/incidents/my/stats — для EXECUTIVE полный охват компании; для других ролей — по правам бэкенда */
@@ -225,9 +235,10 @@ export interface RuleShortInfo {
 }
 
 export interface UserBasicInfo {
-  id: string;
+  id?: string;
   firstName?: string;
   lastName?: string;
+  username?: string;
   fullName?: string;
   email?: string;
 }

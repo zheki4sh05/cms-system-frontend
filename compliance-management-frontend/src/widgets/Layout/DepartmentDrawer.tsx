@@ -116,6 +116,22 @@ export const DepartmentsDrawer: FC<DepartmentsDrawerProps> = observer(({ open, o
     void loadDepartments();
   }, [open, loadDepartments]);
 
+  useEffect(() => {
+    if (open) {
+      return;
+    }
+    setAnchorEl(null);
+    setMenuDepartment(null);
+    setCreateDialogOpen(false);
+    setEditDialogOpen(false);
+    setAssignSupervisorDialogOpen(false);
+    setEmployeesDialogOpen(false);
+    setSelectedDepartment(null);
+    setSelectedDepartmentDetails(null);
+    setEmployeesLoadError(null);
+    setEmployeesLoadingDepartmentId(null);
+  }, [open]);
+
   const filteredDepartments = departments.filter(dept =>
     dept.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (dept.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())

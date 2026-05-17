@@ -190,7 +190,10 @@ export interface RulesListItem {
   action: string;
   categoryId: string;
   categoryLabel: string;
+  /** Числовой вес правила в очереди */
   priority: string;
+  /** Серьёзность срабатывания / уровень риска правила */
+  severity?: RuleSeverity;
   enabled: boolean;
   riskObjectId: string;
   riskObject: RuleRiskObject;

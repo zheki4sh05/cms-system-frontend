@@ -80,11 +80,11 @@ import { useNavigate } from 'react-router-dom';
 import { CaseApi } from '@shared/lib/api/caseApi';
 import { getFileKindShortLabel } from '@shared/lib/fileDisplay';
 import { getCaseStatusLabelRu } from '@shared/lib/statusLabels';
+import { getSeverityLabelRu, getTaskStatusLabelRu } from '@shared/lib/domainLabelsRu';
 import {
   CaseSeverity,
   type Case,
   CaseStatus,
-  type CasePriority,
   type CaseComment,
   type CaseAttachment,
   type CaseStatistics,
@@ -611,7 +611,7 @@ export const SupervisorCasesPage: FC = observer(() => {
                         </TableCell>
                         <TableCell>
                           <Chip
-                            label={caseItem.severity}
+                            label={getSeverityLabelRu(caseItem.severity)}
                             color={getSeverityColor(caseItem.severity)}
                             size="small"
                           />
@@ -687,7 +687,7 @@ export const SupervisorCasesPage: FC = observer(() => {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={caseItem.severity}
+                          label={getSeverityLabelRu(caseItem.severity)}
                           color={getSeverityColor(caseItem.severity)}
                           size="small"
                         />
@@ -807,7 +807,7 @@ export const SupervisorCasesPage: FC = observer(() => {
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <Chip
-                      label={selectedCase.severity}
+                      label={getSeverityLabelRu(selectedCase.severity)}
                       color={getSeverityColor(selectedCase.severity)}
                       size="small"
                     />
@@ -1292,7 +1292,7 @@ export const SupervisorCasesPage: FC = observer(() => {
                                   </TableCell>
                                   <TableCell>
                                     <Chip
-                                      label={action.status}
+                                      label={getTaskStatusLabelRu(action.status)}
                                       size="small"
                                       color={action.status === 'DONE' ? 'success' : 'default'}
                                     />

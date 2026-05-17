@@ -802,26 +802,22 @@ http.patch(`${API_BASE_URL}/company`, async ({ request }) => {
   return HttpResponse.json(mockCompanyProfile);
 }),
 
-  // GET …/api/users/:userId/basic-info (user-service, IncidentApi.getUserBasicInfo)
-  http.get('http://localhost:8081/api/users/:userId/basic-info', async ({ params }) => {
+  // GET /api/users/:userId/basic-info (IncidentApi.getUserBasicInfo)
+  http.get(`${AUTH_API_BASE_URL}/api/users/:userId/basic-info`, async ({ params }) => {
     await delay(200);
     const userId = String(params.userId);
     const u = mockUsers.find((row) => row.id === userId);
     if (u) {
       return HttpResponse.json({
-        id: u.id,
         firstName: u.firstName,
         lastName: u.lastName,
-        fullName: `${u.firstName} ${u.lastName}`.trim(),
-        email: u.email,
+        username: u.email,
       });
     }
     return HttpResponse.json({
-      id: userId,
       firstName: 'Сотрудник',
-      lastName: '',
-      fullName: `Пользователь ${userId}`,
-      email: undefined,
+      lastName: userId,
+      username: `user-${userId}`,
     });
   }),
 

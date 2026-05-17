@@ -46,6 +46,7 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { notificationStore } from '@shared/stores/notificationStore';
+import { getWorkflowPriorityLabelRu } from '@shared/lib/domainLabelsRu';
 import type { Notification, NotificationCategory } from '@shared/types/notificationTypes';
 
 interface TabPanelProps {
@@ -79,6 +80,8 @@ export const NotificationPanel: FC = observer(() => {
 
   const handleClose = () => {
     setAnchorEl(null);
+    setMenuAnchorEl(null);
+    setSelectedNotification(null);
   };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -339,7 +342,7 @@ export const NotificationPanel: FC = observer(() => {
                           </Typography>
                           {notification.priority !== 'LOW' && (
                             <Chip
-                              label={notification.priority}
+                              label={getWorkflowPriorityLabelRu(notification.priority)}
                               size="small"
                               color={getPriorityColor(notification.priority)}
                             />
@@ -447,7 +450,7 @@ export const NotificationPanel: FC = observer(() => {
                           </Typography>
                           {notification.priority !== 'LOW' && (
                             <Chip
-                              label={notification.priority}
+                              label={getWorkflowPriorityLabelRu(notification.priority)}
                               size="small"
                               color={getPriorityColor(notification.priority)}
                             />

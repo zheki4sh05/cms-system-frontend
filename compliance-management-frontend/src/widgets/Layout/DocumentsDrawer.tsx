@@ -1,4 +1,4 @@
-import { type FC, useState } from 'react';
+import { type FC, useState, useEffect } from 'react';
 import {
   Drawer,
   Box,
@@ -97,6 +97,14 @@ export const DocumentsDrawer: FC<DocumentsDrawerProps> = ({ open, onClose }) => 
     setAnchorEl(null);
     setSelectedDoc(null);
   };
+
+  useEffect(() => {
+    if (open) {
+      return;
+    }
+    setAnchorEl(null);
+    setSelectedDoc(null);
+  }, [open]);
 
   const getFileIcon = (type: string) => {
     switch (type) {

@@ -59,6 +59,12 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { IncidentApi } from '@shared/lib/api/incidentApi';
 import { getIncidentStatusLabelRu } from '@shared/lib/statusLabels';
+import {
+  getIncidentCategoryLabelRu,
+  getSeverityLabelFeminineRu,
+  getSeverityLabelRu,
+  getWorkflowPriorityLabelRu,
+} from '@shared/lib/domainLabelsRu';
 import { RuleApi } from '@shared/lib/api/ruleApi';
 import { useAuthStore } from '@features/auth/useAuthStore';
 import {
@@ -94,6 +100,24 @@ function shouldShowAssignToMeForPartlyProgress(incident: Incident, currentUserId
   const employees = incident.employees;
   if (!employees?.length) return true;
   return !employees.some((e) => e.userId === currentUserId);
+}
+
+/**
+ * На вкладке «Начатые»: по cases[] — если у текущего пользователя caseId ещё null,
+ * показываем действия как для NEW («Взять в работу»), иначе — «Решить».
+ */
+function shouldShowStartWorkOnStartedTab(incident: Incident, currentUserId?: string): boolean {
+  if (!currentUserId) return false;
+  if (incident.status !== 'ASSIGNED' && incident.status !== 'PARTLY_PROGRESS') return false;
+
+  const myCase = incident.cases?.find((c) => c.id === currentUserId);
+  if (myCase) return myCase.caseId === null;
+
+  if (incident.status === 'PARTLY_PROGRESS') {
+    return shouldShowAssignToMeForPartlyProgress(incident, currentUserId);
+  }
+
+  return false;
 }
 
 export const ManagerIncidentsPage: FC = observer(() => {
@@ -447,18 +471,6 @@ export const ManagerIncidentsPage: FC = observer(() => {
     return getIncidentStatusLabelRu(status);
   };
 
-  const getCategoryLabel = (category: IncidentCategory) => {
-    const labels = {
-      FINANCIAL: 'Финансы',
-      VENDOR: 'Контрагенты',
-      COMPLIANCE: 'Комплаенс',
-      LOGISTICS: 'Логистика',
-      DATA_QUALITY: 'Качество данных',
-      ETHICS: 'Этика',
-    };
-    return labels[category];
-  };
-
   const stringifyCategoryValue = (value: unknown): string => {
     if (typeof value === 'string') return value;
     if (typeof value === 'number' || typeof value === 'boolean') return String(value);
@@ -483,29 +495,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
     if (incident.categoryId != null) {
       return stringifyCategoryValue(incident.categoryId);
     }
-    return getCategoryLabel(incident.category);
-  };
-
-  const getPriorityLabel = (priority?: string): string => {
-    if (!priority) return '-';
-    const labels: Record<string, string> = {
-      LOW: 'Низкий',
-      MEDIUM: 'Средний',
-      HIGH: 'Высокий',
-      CRITICAL: 'Критичный',
-    };
-    return labels[priority.toUpperCase()] || priority;
-  };
-
-  const getSeverityLabel = (severity?: string): string => {
-    if (!severity) return '-';
-    const labels: Record<string, string> = {
-      LOW: 'Низкая',
-      MEDIUM: 'Средняя',
-      HIGH: 'Высокая',
-      CRITICAL: 'Критичная',
-    };
-    return labels[severity.toUpperCase()] || severity;
+    return getIncidentCategoryLabelRu(incident.category);
   };
 
   const filteredIncidents = incidents.filter((i) => {
@@ -934,7 +924,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={incident.severity}
+                          label={getSeverityLabelRu(incident.severity)}
                           color={getSeverityColor(incident.severity)}
                           size="small"
                         />
@@ -1009,7 +999,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={incident.severity}
+                          label={getSeverityLabelRu(incident.severity)}
                           color={getSeverityColor(incident.severity)}
                           size="small"
                         />
@@ -1030,15 +1020,27 @@ export const ManagerIncidentsPage: FC = observer(() => {
                             <ViewIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Решить">
-                          <IconButton
-                            size="small"
-                            color="success"
-                            onClick={() => handleOpenResolveDialog(incident)}
-                          >
-                            <ResolveIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                        {shouldShowStartWorkOnStartedTab(incident, authStore.user?.id) ? (
+                          <Tooltip title="Взять в работу">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() => handleAssignToMe(incident.id)}
+                            >
+                              <StartIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        ) : (
+                          <Tooltip title="Решить">
+                            <IconButton
+                              size="small"
+                              color="success"
+                              onClick={() => handleOpenResolveDialog(incident)}
+                            >
+                              <ResolveIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1091,7 +1093,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={incident.severity}
+                          label={getSeverityLabelRu(incident.severity)}
                           color={getSeverityColor(incident.severity)}
                           size="small"
                         />
@@ -1230,7 +1232,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <Chip
-                      label={selectedIncident.severity}
+                      label={getSeverityLabelRu(selectedIncident.severity)}
                       color={getSeverityColor(selectedIncident.severity)}
                       size="small"
                     />
@@ -1309,7 +1311,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
                         <Grid size={{ xs: 6 }}>
                           <Typography variant="caption" color="text.secondary">Приоритет</Typography>
                           <Typography variant="body2">
-                            {getPriorityLabel(activeFindingSlide.rule?.priority)}
+                            {getWorkflowPriorityLabelRu(activeFindingSlide.rule?.priority)}
                           </Typography>
                         </Grid>
                         <Grid size={{ xs: 6 }}>
@@ -1333,7 +1335,7 @@ export const ManagerIncidentsPage: FC = observer(() => {
                               <Box>
                                 <Typography variant="caption" color="text.secondary">Критичность риска</Typography>
                                 <Typography variant="body2">
-                                  {getSeverityLabel(activeFindingSlide.details.severity)}
+                                  {getSeverityLabelFeminineRu(activeFindingSlide.details.severity)}
                                 </Typography>
                               </Box>
                             )}
@@ -1389,7 +1391,8 @@ export const ManagerIncidentsPage: FC = observer(() => {
                   Закрыть
                 </Button>
                 {(selectedIncident.status === 'NEW' ||
-                  shouldShowAssignToMeForPartlyProgress(selectedIncident, authStore.user?.id)) && (
+                  shouldShowAssignToMeForPartlyProgress(selectedIncident, authStore.user?.id) ||
+                  shouldShowStartWorkOnStartedTab(selectedIncident, authStore.user?.id)) && (
                   <Button
                     variant="outlined"
                     onClick={() => handleAssignToMe(selectedIncident.id)}
@@ -1402,7 +1405,8 @@ export const ManagerIncidentsPage: FC = observer(() => {
                   selectedIncident.status === 'IN_REVIEW' ||
                   (selectedIncident.status === 'PARTLY_PROGRESS' &&
                     !!authStore.user?.id &&
-                    (selectedIncident.employees ?? []).some((e) => e.userId === authStore.user.id))) && (
+                    (selectedIncident.employees ?? []).some((e) => e.userId === authStore.user.id))) &&
+                  !shouldShowStartWorkOnStartedTab(selectedIncident, authStore.user?.id) && (
                   <Button
                     variant="contained"
                     onClick={() => {
@@ -1551,8 +1555,9 @@ export const ManagerIncidentsPage: FC = observer(() => {
                     label="Приоритет"
                   >
                     <MenuItem value="LOW">Низкий</MenuItem>
-                    <MenuItem value="NORMAL">Средний</MenuItem>
+                    <MenuItem value="NORMAL">Обычный</MenuItem>
                     <MenuItem value="HIGH">Высокий</MenuItem>
+                    <MenuItem value="URGENT">Срочный</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>

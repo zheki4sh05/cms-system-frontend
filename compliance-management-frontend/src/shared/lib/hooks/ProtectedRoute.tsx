@@ -22,15 +22,7 @@ export const ProtectedRoute: FC<ProtectedRouteProps> = observer(
     // Проверка ролей, если они указаны
     if (allowedRoles && authStore.userRole) {
       if (!allowedRoles.includes(authStore.userRole)) {
-        // Редирект на дашборд соответствующей роли
-        let targetPath = "dashboard";
-
-        if(authStore.isFirstLogin){
-          targetPath =  getRolePath(authStore.userRole, "help");
-        }else{
-          targetPath =  getRolePath(authStore.userRole, "dashboard");
-        }
-      
+        const targetPath = getRolePath(authStore.userRole, 'dashboard');
         return <Navigate to={targetPath} replace />;
       }
     }

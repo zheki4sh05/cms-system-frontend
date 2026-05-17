@@ -18,6 +18,10 @@ export interface Task {
   id: string;
   title: string;
   description: string;
+  /** GET /action-plans — рекомендация по задаче (корректирующее действие) */
+  recommendation?: string;
+  /** Дополнительные поля задачи с сервера */
+  details?: Record<string, unknown>;
   status: TaskStatus;
   priority: TaskPriority;
   incidentId?: string;
